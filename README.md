@@ -1,5 +1,9 @@
 ### CS340lx: (even more) advanced systems labs
 
+<p align="center">
+  <img src="labs/lab-memes/plan.png" width="350" />
+</p>
+
 Official description:
   - This is an implementation-heavy, lab-based class that continues the
     topics from CS240LX. The labs will be more specialized, with an emphasis
@@ -59,6 +63,10 @@ What's the big picture goal:
 -------------------------------------------------------------------
 ### Possible labs
 
+<p align="center">
+  <img src="labs/lab-memes/battle-bot.jpg" width="350" />
+</p>
+
 Some possible good labs from 240lx final projects
 
  - Stuart's elf debug: use to make a real profiler.
@@ -100,6 +108,6 @@ stuff.
 
 
 <p align="center">
-  <img src="labs/lab-memes/you-get-better.jpg" width="350" />
+  <img src="labs/lab-memes/adhd-flow-state.jpg" width="350" />
 </p>
 
