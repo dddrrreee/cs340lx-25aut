@@ -1,5 +1,12 @@
 ### CS340lx: (even more) advanced systems labs
 
+Official description:
+  - This is an implementation-heavy, lab-based class that continues the
+    topics from CS240LX. The labs will be more specialized, with an emphasis
+    on research-worthy topics and techniques. The class format will follow
+    CS240LX: two labs, twice a week, along with a set of research papers
+    for context.
+
 Context:
  - Final class in the 140e/240lx pipeline (as of rn :).
  - We only offer it every few years when there is an unusual 
@@ -26,12 +33,10 @@ Structure:
 What's the big picture goal: 
 
  - Do a bunch of cool devices for fun.  
-
    Since we have a limited enrollment, can afford more expensive ones
    (lidar, screens, kilometer capable LoRa RF)
 
  - Do a bunch of new sbc's --- arm, riscv, whatever.  
-
    Often bootup is the most difficult part, so it's good to have
    a portfolio.  Also once you see more, you start to get a feel for
    what is an arbitrary choice and which have a
