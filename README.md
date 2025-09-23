@@ -31,23 +31,26 @@ Structure:
    elf lab) these labs can >>> better than our staff ones :)
 
 What's the big picture goal: 
+ - Do a bunch of cool devices for fun.  
 
- - Do a bunch of cool devices for fun.  Since we have a limited
-   enrollment, can afford more expensive ones (lidar, screens, kilometer
-   capable LoRa RF)
- - Do a bunch of new sbc's --- arm, riscv, whatever.  Often bootup is
+   Since we have a limited enrollment, can afford more expensive ones
+   (lidar, screens, kilometer capable LoRa RF)
+
+ - Do a bunch of new sbc's --- arm, riscv, whatever.  
+
+   Often bootup is
    the most difficult part, so it's good to have a portfolio.  Also once
    you see more, you start to get a feel for what is an arbitrary choice
+
    and which have a
  - Now that you have a solid grasp of low-level hardware and code, we 
-   build more advanced stuff, and go much deeper.  
+   build more advanced stuff, and go much deeper.    
 
-     - Doing Turing complete DMA (based on Max Cura's hack)
-     - Speed up interrupts/exceptions by 50x.
+   From the past: build a riscv simulator that can simulate itself and
+   is register equivalent with the hardware.
 
+ - Build simple versions of advanced techniques in other areas.
    Some examples from the past:
-     - A couple of labs to build a riscv simulator that can simulate 
-       itself and is register equivalent with the hardware.
      - Build a SAT solver (Matthew)
      - Build a constraint solver (Matthew)
      - Static analysis bug finders (Matthew and Manya),
@@ -73,6 +76,8 @@ Likely devices:
   - sbcs: pico 2, pico, ox64, pi zero 2
 
 Tentative things I'd like to do (won't do all)
+     - Doing Turing complete DMA (based on Max Cura's hack) - Speed up
+     interrupts/exceptions by 50x.
   - a solid network boot loader that works over RF, sound, light, IR.
     It's wild to send code using sound or a blinky light.
   - A few projects putting together several devices.
