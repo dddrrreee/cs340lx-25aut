@@ -97,3 +97,9 @@ Tentative things I'd like to do (won't do all)
 The basic play: we've spend a couple quarters learning alot of low-level
 stuff the hard way.  Now reap the rewards using it to build the cool
 stuff.
+
+
+<p align="center">
+  <img src="labs/lab-memes/you-get-better.jpg" width="350" />
+</p>
+
