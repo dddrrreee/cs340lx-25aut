@@ -41,17 +41,19 @@ What's the big picture goal:
  - Now that you have a solid grasp of low-level hardware and code, we 
    build more advanced stuff, and go much deeper.  
 
-   Some examples from the past:
-     - A couple of labs to build a riscv simulator that can simulate 
-       itself and is register equivalent with the hardware.
      - Doing Turing complete DMA (based on Max Cura's hack)
      - Speed up interrupts/exceptions by 50x.
 
+   Some examples from the past:
+     - A couple of labs to build a riscv simulator that can simulate 
+       itself and is register equivalent with the hardware.
      - Build a SAT solver (Matthew)
      - Build a constraint solver (Matthew)
      - Static analysis bug finders (Matthew and Manya),
      - Verilog FPGA examples (Zack)
 
+-------------------------------------------------------------------
+### Possible labs
 
 Some possible good labs from 240lx final projects
 
@@ -62,7 +64,7 @@ Some possible good labs from 240lx final projects
  - handwriting rec (Chia-Hsiang, Irene, Kaylee, Weixin)
  - fuse?
 
-Devices:
+Likely devices:
   - i2s microphone, 
   - class D amplifier + speaker
   - HDMI screen
@@ -71,13 +73,17 @@ Devices:
 
 Tentative things I'd like to do (won't do all)
   - a solid network boot loader that works over RF, sound, light, IR.
-  - a few projects putting together several devices.
+    It's wild to send code using sound or a blinky light.
+  - A few projects putting together several devices.
     (e.g., accel controlled lights, acoustically reactive displays)
+    Key: use tricks to verify the system so you're suprised if it breaks.
   - in honor of Joe: chip8 video game emulator.
-  - make a bunch of stuff really, really fast.  e.g., beat your macos
-    on things like exceptions using pi.  make tiny processes so you can
-    quickly fork 100,000.
-  - build the runtime tools we were discussing: eraser race detector, 
+  - Make a bunch of stuff really, really fast.  Fun hack is write code
+    on your pi that beats
+    linux/macos on your fancy modern laptop --- e.g., exceptions or 
+    tiny processes so you can quickly fork 100,000 (versus crashing 
+    your laptop).
+  - finally build the runtime tools we were discussing: eraser race detector, 
     volatile checker.
   - do much better versions of 140e labs so can pull them in: ideally
     a simple complete OS.  definitely a better fast FAT32
