@@ -9,13 +9,11 @@ Context:
 Structure:
  - 140e and 240lx have to fulfill class requirements, so content somewhat
    constrained.  
-
  - 340lx we build whatever seems interesting --- only rule is we build and
    you have a working example of a cool trick or deep method every lab.
 
    In general: we go broader on fun stuff (devices), go deeper on
    interesting stuff than the simple examples in previous labs.  
-
  - One fantastic difference: Around half of the labs are usually
    student-written.  You have already suffered through over 30 labs
    as consumers, so now is your chance to buld the labs you would have 
