@@ -67,6 +67,9 @@ What's the big picture goal:
   <img src="labs/lab-memes/battle-bot.jpg" width="350" />
 </p>
 
+Definite lab:
+ - Parthiv's PCB lab next thursday 10/2.
+
 Some possible good labs from 240lx final projects
 
  - Stuart's elf debug: use to make a real profiler.
@@ -81,6 +84,7 @@ Likely devices:
   - class D amplifier + speaker
   - HDMI screen
   - Lidar
+  - camera?
   - sbcs: pico 2, pico, ox64, pi zero 2
 
 Tentative things I'd like to do (won't do all)
@@ -108,6 +112,6 @@ stuff.
 
 
 <p align="center">
-  <img src="labs/lab-memes/adhd-flow-state.jpg" width="350" />
+  <img src="labs/lab-memes/adhd-tetris.jpg" width="350" />
 </p>
 
