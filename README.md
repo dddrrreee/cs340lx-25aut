@@ -32,15 +32,13 @@ Structure:
 
 What's the big picture goal: 
 
- - Do a bunch of cool devices for fun.  
-   Since we have a limited enrollment, can afford more expensive ones
-   (lidar, screens, kilometer capable LoRa RF)
-
- - Do a bunch of new sbc's --- arm, riscv, whatever.  
-   Often bootup is the most difficult part, so it's good to have
-   a portfolio.  Also once you see more, you start to get a feel for
-   what is an arbitrary choice and which have a
-
+ - Do a bunch of cool devices for fun.  Since we have a limited
+   enrollment, can afford more expensive ones (lidar, screens, kilometer
+   capable LoRa RF)
+ - Do a bunch of new sbc's --- arm, riscv, whatever.  Often bootup is
+   the most difficult part, so it's good to have a portfolio.  Also once
+   you see more, you start to get a feel for what is an arbitrary choice
+   and which have a
  - Now that you have a solid grasp of low-level hardware and code, we 
    build more advanced stuff, and go much deeper.  
 
