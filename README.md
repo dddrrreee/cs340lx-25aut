@@ -16,6 +16,7 @@ Context:
  - We only offer it every few years when there is an unusual 
    group.  Lots of great alumni!
  - This is the 3rd offering.
+ - Joe graduated, but we have Joseph as a variant!
 
 Structure:
  - 140e and 240lx have to fulfill class requirements, so content somewhat
