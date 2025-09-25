@@ -355,7 +355,7 @@ We stated above you should look at your interrupt routine
 Our main goal is to make this shorter.  
 
 If you look at the machine code, there's a bunch of loads (we get rid
-of these next), and a and a conditional (`tst`) where the handler does
+of these next), and a conditional (`tst`) where the handler does
 a GPIO read and checks its value to determine whether to increment the
 rising or falling edge counter.
 
@@ -474,10 +474,10 @@ that will:
 Instead we just try to get rid of the load instructions.  
 
 So why do we have the two initial loads?
-``
+```
     8054:   e59f2014    ldr r2, [pc, #20]   ; 8070 <int_vector+0x20>
     8058:   e59f1014    ldr r1, [pc, #20]   ; 8074 <int_vector+0x24>
-``
+```
 If you look the word at 8070:
 ```
     8070:   000098ac    .word   0x000098ac
