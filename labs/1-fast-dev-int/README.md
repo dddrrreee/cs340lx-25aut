@@ -735,8 +735,11 @@ be great if you do!
 ### Step 5: do it all in assembly
 
 ***NOTE: if you see this do a pull***
+
 ***NOTE: if you see this do a pull***
+
 ***NOTE: if you see this do a pull***
+
 ***NOTE: if you see this do a pull***
 
 One nice thing about trimming so many instructions is that now the
