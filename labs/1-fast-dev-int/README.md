@@ -572,16 +572,16 @@ ave cost = 597.150024
 ----------------------------------------------------------------------
 ### Step 5: housekeeping
 
-Now that we reduced our timings down so much, we do some basic housekeeping
-so that we don't get spurious speedups and slowdowns because of changing
-alignment.  Recall that the instruction prefetch buffer is 32-bytes,
-where the first instruction address in each fetch is 32-byte aligned.
-If our code can be read in a single prefetch it will run noticably
-faster than if it takes two.  Unfortunately if we don't force alignment,
-random changes in the one part of the code can cause cascading alignment
-changes in all subsequent (unrelated) code locations leading to big
-timing swings.  (We should have done this sooner, but I forgot and am
-too lazy to remeasure.)
+Now that we reduced our timings down so much, we do some basic
+housekeeping so that we don't get spurious speedups and slowdowns because
+of changing instruction alignment.  Recall that the instruction prefetch
+buffer is 32-bytes, where the first instruction address in each fetch is
+32-byte aligned.  If our code can be read in a single prefetch it will
+run noticably faster than if it takes two.  Unfortunately if we don't
+force alignment, random changes in the one part of the code can cause
+cascading alignment changes in all subsequent (unrelated) code locations
+leading to big timing swings.  (We should have done this sooner, but I
+forgot and am too lazy to remeasure.)
 
 We care about:
   1. The interrupt trampoline: we want this 32-byte aligned so the
@@ -695,17 +695,6 @@ If you look at the interrupt handler we've removed one instruction.
 This gives us a modest speedup from 562 cycles to 549.  However,
 importantly, it makes the next change we do easier.
 
-In addition, if you look at the results we have massively reduced
-variance:
-  - Before we had a random jumps to 630 cycles. 
-  - Whereas here other than the initial measurement, the cost bounces
-    between 538 to 555.  Removing operations often cuts variance, though
-    in non-deterministic ways.
-
-I should have measured variance in addition to average --- it would
-be great if you do!
-
-
 ```
 0: rising	= 665 cycles
 1: falling	= 538 cycles
@@ -730,8 +719,25 @@ be great if you do!
 ave cost = 549.299987
 ```
 
+In addition, if you look at the results we have massively reduced
+variance:
+  - Before we had a random jumps to 630 cycles. 
+  - Whereas here other than the initial measurement, the cost bounces
+    between 538 to 555.  Removing operations often cuts variance, though
+    in non-deterministic ways.
+
+I should have measured variance in addition to average --- it would
+be great if you do!
+
+
+
 ----------------------------------------------------------------------
 ### Step 5: do it all in assembly
+
+***NOTE: if you see this do a pull***
+***NOTE: if you see this do a pull***
+***NOTE: if you see this do a pull***
+***NOTE: if you see this do a pull***
 
 One nice thing about trimming so many instructions is that now the
 interrupt handler machine code is tiny, which means we can easily just
