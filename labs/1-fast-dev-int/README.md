@@ -478,17 +478,16 @@ So why do we have the two initial loads?
     8054:   e59f2014    ldr r2, [pc, #20]   ; 8070 <int_vector+0x20>
     8058:   e59f1014    ldr r1, [pc, #20]   ; 8074 <int_vector+0x24>
 ```
-If you look the word at 8070:
+If you look the word at 8070 it is the address of `n_interrupt`:
 ```
     8070:   000098ac    .word   0x000098ac
 ```
-This is the address of `n_interrupt`.
 
-The second the word at 8074:
+The second the word at 8074 is 
+the base address of GPIO, used by your event clear code:
 ```
     8074:   20200000    .word   0x20200000
 ```
-This is the base address of GPIO, used by your event clear code.
 
 Why does the code look like this?  ARM instructions are only 32-bits,
 so requires multiple instructions to load an arbitrary 32-bit constant in
