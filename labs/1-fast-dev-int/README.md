@@ -17,7 +17,7 @@ Two favorite things about the lab:
      not alot to worry about besides your own ideas and hardware features
      / implications.
 
-### Starter code: `code/gpio-int.c` and `code/interrupt-asm.S`
+#### Starter code: `code/gpio-int.c` and `code/interrupt-asm.S`
 
 The starter code measures how long it takes to handle a GPIO generated
 interrupt.  There are two files:
@@ -51,7 +51,7 @@ Why do we want fast interrupts?
      You don't have to believe me: you'll see variance drop as you tune
      the code.
 
-### Checkoff
+#### Checkoff
 
 The rest of the README discusses the different tricks I did and the
 speedups I got.   You should implement each one and see that you got
