@@ -80,12 +80,18 @@ int gpio_has_interrupt(void);
 // if you want lower latency, you should us async rising edge (p99)
 void gpio_int_rising_edge(unsigned pin);
 
+// same but triggers after a single sample versus two.
+void gpio_int_async_rising_edge(unsigned pin) ;
+
 // p98: detect falling edge (1->0).  sampled using the system clock.  
 // similarly to rising edge detection, it suppresses noise by looking for
 // "100" --- i.e., is triggered after two readings of "0" and so the 
 // interrupt is delayed two clock cycles.   if you want  lower latency,
 // you should use async falling edge. (p99)
 void gpio_int_falling_edge(unsigned pin);
+
+// same but triggers after a single sample versus two.
+void gpio_int_async_falling_edge(unsigned pin);
 
 // p98: detect when input pin=1.  must clear the source of the 
 // interrupt before clearing the event or it will just retrigger.
@@ -104,8 +110,6 @@ int gpio_event_detected(unsigned pin);
 // p96: have to write a 1 to the pin to clear the event.
 void gpio_event_clear(unsigned pin);
 
-void gpio_int_async_falling_edge(unsigned pin);
-void gpio_int_async_rising_edge(unsigned pin) ;
 
 void gpio_fiq_async_falling_edge(unsigned pin);
 void gpio_fiq_async_rising_edge(unsigned pin);

@@ -1,7 +1,7 @@
 #include "rpi.h"
 #include "cycle-count.h"
 #include "memmap.h"
-#include "redzone.h"
+// #include "redzone.h"
 
 // called to get the absolute end of the memory used
 // by the program: later in the quarter we will append
@@ -69,7 +69,7 @@ void _cstart() {
 
     // hack to catch errors where they write to the first
     // 4k of memory.
-    redzone_init();
+    // redzone_init();
 
     // call user's <notmain> (should add argv)
     notmain(); 
