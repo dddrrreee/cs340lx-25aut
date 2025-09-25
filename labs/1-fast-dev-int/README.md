@@ -77,48 +77,6 @@ like to make the code faster!
 ----------------------------------------------------------------------
 ### Workflow for optimizing code
 
-
-----------------------------------------------------------------------
-### Step 0: our starting point.
-
-Our first run is awful:
-```
-0: rising	= 3608 cycles
-1: falling	= 3193 cycles
-2: rising	= 3244 cycles
-3: falling	= 3190 cycles
-4: rising	= 3244 cycles
-5: falling	= 3184 cycles
-6: rising	= 3244 cycles
-7: falling	= 3198 cycles
-8: rising	= 3258 cycles
-9: falling	= 3198 cycles
-10: rising	= 3244 cycles
-11: falling	= 3184 cycles
-12: rising	= 3253 cycles
-13: falling	= 3202 cycles
-14: rising	= 3250 cycles
-15: falling	= 3201 cycles
-16: rising	= 3256 cycles
-17: falling	= 3190 cycles
-18: rising	= 3252 cycles
-19: falling	= 3184 cycles
-ave cost = 3238.483647
-```
-
-Bad things:
-  1. Interrupt cost is huge: average = 3238 cycles.  By default 
-     the pi runs at 700MHz cycles per second, so we can do *at best* about 
-     216,182 interrupts per second (700 * 1000 * 1000 / 3238).
-
-     For comparison: as you saw in the PMU lab, a single cached
-     non-pipelined add instruction takes 1 cycle.  3238 is 
-     alot of instructions!
-
-  2. The times bounce around significantly (min: 3184, max: 3608).
-     It would be laughable to use this for something like the ws2812b
-     or a logic analyzer.
-
 #### Mechanical Workflow
 
 After initial wins, optimizing code commonly:
@@ -182,24 +140,47 @@ Some absolute rules:
   4. Keep it simple.  Simple code is much easier to make fast
      versus complex.  (Just like anything else!)
 
+
 ----------------------------------------------------------------------
-outlining
+### Step 0: our starting point.
 
-we saw that the more code you give the compiler the faster it can 
-make it.  but outlining also works:
-the obverse is true: the more code that doesn't 
-atter that you 
+Our first run is awful:
+```
+0: rising	= 3608 cycles
+1: falling	= 3193 cycles
+2: rising	= 3244 cycles
+3: falling	= 3190 cycles
+4: rising	= 3244 cycles
+5: falling	= 3184 cycles
+6: rising	= 3244 cycles
+7: falling	= 3198 cycles
+8: rising	= 3258 cycles
+9: falling	= 3198 cycles
+10: rising	= 3244 cycles
+11: falling	= 3184 cycles
+12: rising	= 3253 cycles
+13: falling	= 3202 cycles
+14: rising	= 3250 cycles
+15: falling	= 3201 cycles
+16: rising	= 3256 cycles
+17: falling	= 3190 cycles
+18: rising	= 3252 cycles
+19: falling	= 3184 cycles
+ave cost = 3238.483647
+```
 
-mention:
-    - should have compacted the code.
-    - should have also messed with the vector table [can use for above]
+Bad things:
+  1. Interrupt cost is huge: average = 3238 cycles.  By default 
+     the pi runs at 700MHz cycles per second, so we can do *at best* about 
+     216,182 interrupts per second (700 * 1000 * 1000 / 3238).
 
-other fast:
-    - do fast exception and compare to unix.
-    - do fast SS exception and see how much better can make things
-    - do fast fork and see how many can do 
+     For comparison: as you saw in the PMU lab, a single cached
+     non-pipelined add instruction takes 1 cycle.  3238 is 
+     alot of instructions!
 
-        its
+  2. The times bounce around significantly (min: 3184, max: 3608).
+     It would be laughable to use this for something like the ws2812b
+     or a logic analyzer.
 
 ----------------------------------------------------------------------
 ### Step 1: do the easy stuff.
@@ -207,8 +188,6 @@ other fast:
 It's pretty common that when you decide to optimize  there's a bunch
 of dumb extra stuff in the code that you can cut out immediately.
 This code is no different.
-
-ave cost = 3238.483647
 
 Interrupt handler:
   1. Cut out the global variable `n_interrupt` in the interrupt handler. 
