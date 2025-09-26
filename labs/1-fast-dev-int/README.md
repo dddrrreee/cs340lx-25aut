@@ -692,61 +692,56 @@ If you look at the interrupt handler we've removed one instruction.
 ```
 
 
-This gives us a modest speedup from 552 cycles to 549.  However,
-importantly, it makes the next change we do easier.
+This gives us a modest speedup from 552 cycles to 546.  However,
+importantly, it makes the next change we do easier --- writing the
+entire handler in assembly.
 
 ```
-0: rising	= 665 cycles
+0: rising	= 649 cycles
 1: falling	= 538 cycles
-2: rising	= 543 cycles
-3: falling	= 538 cycles
-4: rising	= 546 cycles
-5: falling	= 538 cycles
-6: rising	= 546 cycles
-7: falling	= 538 cycles
-8: rising	= 546 cycles
-9: falling	= 538 cycles
-10: rising	= 546 cycles
-11: falling	= 540 cycles
-12: rising	= 557 cycles
-13: falling	= 538 cycles
-14: rising	= 543 cycles
-15: falling	= 544 cycles
-16: rising	= 543 cycles
-17: falling	= 546 cycles
-18: rising	= 555 cycles
-19: falling	= 538 cycles
-ave cost = 549.299987
+2: rising	= 538 cycles
+3: falling	= 547 cycles
+4: rising	= 538 cycles
+5: falling	= 547 cycles
+6: rising	= 538 cycles
+7: falling	= 547 cycles
+8: rising	= 538 cycles
+9: falling	= 544 cycles
+10: rising	= 538 cycles
+11: falling	= 547 cycles
+12: rising	= 540 cycles
+13: falling	= 541 cycles
+14: rising	= 538 cycles
+15: falling	= 538 cycles
+16: rising	= 541 cycles
+17: falling	= 541 cycles
+18: rising	= 538 cycles
+19: falling	= 547 cycles
+ave cost = 546.650024
 ```
-
-In addition, if you look at the results we have massively reduced
-variance:
-  - Before we had a random jumps to 630 cycles. 
-  - Whereas here other than the initial measurement, the cost bounces
-    between 538 to 555.  Removing operations often cuts variance, though
-    in non-deterministic ways.
-
-I should have measured variance in addition to average --- it would
-be great if you do!
-
-
 
 ----------------------------------------------------------------------
-### Step 5: do it all in assembly
+### Step 7: do it all in assembly
 
 One big overhead: all the extra instructions used by the interrupt
-trampoline (`interrupt-asm.S:interrupt`) to save and restore registers
-before calling `int_vector`.    We now get rid of this.
+trampoline (`interrupt-asm.S:interrupt`) to setup the machine state so
+that it can call the C handler (`int_vector`).  Especially costly: The
+loads and stores used to save/restore registers.  
+We now get rid of much of this overhead.
 
 One nice thing about trimming so many instructions is that now the
 interrupt handler machine code is tiny, which means we can easily just
-write it directly in assembly code.  (This dynamic is not uncommon!) 
+write it directly in assembly code and inline it into the trampoline
+code.  (This dynamic is not uncommon!) 
 
-The reason for doing so here is not that assembly isn't necesarily magic,
-but in this case it lets us:
-  1. Inline the C interrupt handler into the assembly trampoline and then
-     optimize across the boundaries.  We've already seen how this 
-     helps the compiler, but it also helps hand optimization.
+Advantages:
+  1. Inline the C interrupt handler into the assembly trampoline removes
+     the jump to (and return from C code).  Removing the control
+     flow instructions is good, and also reduces cache and prefetch
+     buffer problems.   It also lets us more easily optimize across the
+     trampoline and inlined code.  We've already seen how inlining C
+     code helps the compiler, but it also helps hand optimization.
+
   2. Once we've done step 1, we can then play games with the registers
      that the C compiler can't necessarily. 
 
@@ -756,7 +751,6 @@ but in this case it lets us:
           automatic optimization (try it and let me know!).  However,
           in this case,  we're playing games with the SP that make
           this impossible (afaik, but I didn't ponder long).
-
 
 ```
 00008060 <int_vector>:
@@ -768,42 +762,124 @@ but in this case it lets us:
     8074:   e12fff1e    bx  lr
 ```
 
+
+I did the change in two steps to make it easier to check correctness.
+  1. inline the assembly, but still s
+
 To do the change, I took most of this code and:
-  1. Put all the instructions other than the 
-     "bx lr" in the assembly trampoline 
-     `interrupt-asm.S:interrupt`
-  2. To reduce the need to save and restore registers, 
-     I abused the sp register (recall: the interrupt handler
-     has a private shadow copy) as a general purpose register.
-  3. After (2): Only saved and restored the two registers.
+  1. Inlined all the assembly instructions other than the 
+     "bx lr" in the assembly trampoline `interrupt-asm.S:interrupt`
+  2. Cut down the registers saved and restored to just those needed
+     (two).
 
+After doing so I got almost a 40% improvement!
 
-***NOTE: need to fill in these numbers.***
+```
+0: rising	= 390 cycles
+1: falling	= 338 cycles
+2: rising	= 338 cycles
+3: falling	= 347 cycles
+4: rising	= 344 cycles
+5: falling	= 347 cycles
+6: rising	= 338 cycles
+7: falling	= 338 cycles
+8: rising	= 344 cycles
+9: falling	= 338 cycles
+10: rising	= 338 cycles
+11: falling	= 336 cycles
+12: rising	= 333 cycles
+13: falling	= 338 cycles
+14: rising	= 338 cycles
+15: falling	= 344 cycles
+16: rising	= 338 cycles
+17: falling	= 347 cycles
+18: rising	= 338 cycles
+19: falling	= 347 cycles
+ave cost = 342.950012
+```
+----------------------------------------------------------------------
+### Step 8: cleanup
 
+Now that the code is inlined we can make two other changes.
 
-NOTE:
-  - One easy change we could have done earlier but didn't
-    was to change the trampoline to only save and restore the caller-saved
-    registers --- currently it saves a bunch of callee as well.
-  - A second sleazy change would be to get rid of the initial 
-    jump to the interrupt trampoline.  Since we do not have any
-    other exceptions or interrupts, just inline the trampoline
-    right into the vector table, ignoring the subsequent 
-    slots (in our case, since the interrupt is the last entry
-    in the table before FIQ)  xxx.
+First, we modify the exception pc by doing a subtract as the first
+instruction.  We later do a `movs` of this into the pc to return.
+We can combine these and just do a single `subs`.
+
+Our second sleazy change is to get rid of the initial jump to the
+interrupt trampoline.  Since we do not have any other exceptions or
+interrupts, we can just inline the trampoline right into the vector table,
+ignoring the subsequent slots (in our case, since the interrupt is the
+last entry in the table before FIQ).
+
+At a more detailed level: the `default_vec_ints` interrupt vectors jump
+to the `interrupt` routine:
+```
+default_vec_ints:
+    ...
+    @ the only exception/int we expect: branches to the
+    @ trampoline above.
+    b interrupt_inline
+```
+
+However since we don't use FIQs (yet), there is no other code below
+this last entry --- we can just place the interrupt handler there
+directly, eliminating the jump.
+
+After I do all this, I get the machine code:
+```
+00008360 <default_vec_ints>:
+    8360:   ea00000d    b   839c <reset>
+    8364:   ea000013    b   83b8 <undef>
+    8368:   ea000027    b   840c <syscall>
+    836c:   ea000018    b   83d4 <prefetch_abort>
+    8370:   ea00001e    b   83f0 <data_abort>
+    8374:   ea000008    b   839c <reset>
+    8378:   e3a0d409    mov sp, #150994944  ; 0x9000000
+    837c:   e92d000c    push    {r2, r3}
+    8380:   e3a03001    mov r3, #1
+    8384:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
+    8388:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
+    838c:   e3a02302    mov r2, #134217728  ; 0x8000000
+    8390:   e5832000    str r2, [r3]
+    8394:   e8bd000c    pop {r2, r3}
+    8398:   e25ef004    subs    pc, lr, #4
+```
+
+With a nice speedup for not thinking hard:
+
+```
+0: rising	= 368 cycles
+1: falling	= 327 cycles
+2: rising	= 330 cycles
+3: falling	= 330 cycles
+4: rising	= 321 cycles
+5: falling	= 321 cycles
+6: rising	= 321 cycles
+7: falling	= 330 cycles
+8: rising	= 330 cycles
+9: falling	= 330 cycles
+10: rising	= 321 cycles
+11: falling	= 330 cycles
+12: rising	= 321 cycles
+13: falling	= 330 cycles
+14: rising	= 321 cycles
+15: falling	= 321 cycles
+16: rising	= 321 cycles
+17: falling	= 330 cycles
+18: rising	= 321 cycles
+19: falling	= 319 cycles
+ave cost = 327.149993
+```
 
 ----------------------------------------------------------------------
-### Step 6: do it as a "fast interrupt" (FIQ)
+### Step 9: do it as a "fast interrupt" (FIQ)
 
-***NOTE: at this point I'm still adding stuff.  The rest of the lab
-just has high bits.  Will add more writing.  Tuesday's lab will
-just be continuing the quest.***
-
-Looking at the machine code, we still push a couple of registers, which
+Looking at the machine code, we still push and pop two registers, which
 means we have to have a stack pointer, as well as some extra management.
 We can eliminate all of this by using "fast interrupt" mode.  If you
 look in chapter 4 of the armv6 document you can see that FIQ mode has
-six shadow registers, R8-R14.
+six shadow registers, (R8 through R14).
 
 <img src="images/shadow-regs-pA2-5.png" width="450" />
 
@@ -826,7 +902,6 @@ versions of my gpio interrupt routines that setup the FIQ instead.
     void gpio_fiq_rising_edge(unsigned pin);
     void gpio_fiq_falling_edge(unsigned pin);
 
-
 And use these during setup.  I also made a special FIQ table, and an 
 FIQ initialization routine in assembly.  
 
@@ -847,71 +922,126 @@ So `notmain` becomes:
         fiq_init();
 ```
 
-To initialize the FIQ registers I used the "cps" instruction to switch
+To initialize the FIQ registers I used the `cps` instruction to switch
 into `FIQ_MODE` and setup the FIQ registers to hold the pointers and
-values I want, and then back to `SUPER_MODE` (make sure you prefetch
-flush!).  I then put a panic in the original `int_handler` to verify we
-weren't calling it.
+values I want, and then used `cps` to switch back to `SUPER_MODE` (make
+sure you prefetch flush after each `cps`!).  I then put a panic in the
+original `int_handler` to verify we weren't calling it.
 
 And finally as a hack I used the preprocessor to give the different
-registers "variable names" so I didn't do any stupid mistakes.
+registers "variable names" to reduce stupid mistakes.
 
-    // in interrupt-asm.S
+```
+    @ in interrupt-asm.S
+
+    @ register r8 holds the event clear address
     #define event0      r8
+    @ register r9 holds the value (1<<in_pin) that 
+    @ we write to event clear address
     #define event0_val  r9
-    #define cur_time    r10
-    #define cur_cycle   r11
-
+    @ register r10 holds the value 1 that we write to 
+    @ the scratch register to indicate an interrupt happened
+    #define one         r10
+```
 
 After rewriting the code to exploit the FIQ registers, I got it down
-to 5 instructions:
-  1. cycle count read.
-  2. one store to clear the event interrupt
-  3. one store to write out the current cycle time.
-  4. one write of the co-processor scratch register to write back
-     a pointer to the next timer reading (more on this later).
-  5. a jump back to the interrupted code.
+to 3 instructions:
+  1. One store to clear the event.
+  2. One coprocessor move to indicate the interrupt occured
+  3. One instruction to jump back to the interrupted code.
 
-This gives a great performance improvement: 
-   1. Without icache on: around 290 cycles.
-   2. With icache on about 166 cycles.
-Which is more than 10x faster than our originally!
-
+This gives a great performance improvement: average 268 cycles.  Which is
+almost 12x faster than our original code!
 ```
-rising = 256 cycles
-falling = 288 cycles
-rising = 272 cycles
-falling = 288 cycles
-rising = 272 cycles
-falling = 287 cycles
-rising = 272 cycles
-falling = 288 cycles
-rising = 261 cycles
-falling = 291 cycles
-rising = 270 cycles
-falling = 288 cycles
-rising = 270 cycles
-falling = 291 cycles
-rising = 267 cycles
-falling = 288 cycles
-rising = 270 cycles
-falling = 288 cycles
-rising = 272 cycles
-falling = 288 cycles
+0: rising	= 255 cycles
+1: falling	= 272 cycles
+2: rising	= 263 cycles
+3: falling	= 272 cycles
+4: rising	= 264 cycles
+5: falling	= 272 cycles
+6: rising	= 264 cycles
+7: falling	= 272 cycles
+8: rising	= 264 cycles
+9: falling	= 272 cycles
+10: rising	= 264 cycles
+11: falling	= 272 cycles
+12: rising	= 264 cycles
+13: falling	= 272 cycles
+14: rising	= 270 cycles
+15: falling	= 272 cycles
+16: rising	= 264 cycles
+17: falling	= 272 cycles
+18: rising	= 264 cycles
+19: falling	= 272 cycles
+ave cost = 267.800018
 ```
-
 ----------------------------------------------------------------------
-### Step 7: Icache.
+### Step 10: Icache.
 
 This is easy.  We turn on the icache and write the code to measure
 both with and without.
 
+This makes almost a 40% difference!   Great!
+```
+caches on
+0: rising	= 222 cycles
+1: falling	= 190 cycles
+2: rising	= 158 cycles
+3: falling	= 158 cycles
+4: rising	= 167 cycles
+5: falling	= 158 cycles
+6: rising	= 167 cycles
+7: falling	= 158 cycles
+8: rising	= 167 cycles
+9: falling	= 158 cycles
+10: rising	= 167 cycles
+11: falling	= 167 cycles
+12: rising	= 167 cycles
+13: falling	= 158 cycles
+14: rising	= 167 cycles
+15: falling	= 167 cycles
+16: rising	= 167 cycles
+17: falling	= 158 cycles
+18: rising	= 167 cycles
+19: falling	= 167 cycles
+ave cost = 167.750000
+```
+
 As usual we have a large cost for the first value --- we can eliminate
-this by either doing a warmup or a prefetch.
+this by either doing a warmup or a prefetch (see chapter 3 of the
+arm1176 manual).  You can see this by running the code again:
+```
+0: rising	= 158 cycles
+1: falling	= 158 cycles
+2: rising	= 167 cycles
+3: falling	= 167 cycles
+4: rising	= 167 cycles
+5: falling	= 158 cycles
+6: rising	= 167 cycles
+7: falling	= 167 cycles
+8: rising	= 167 cycles
+9: falling	= 167 cycles
+10: rising	= 167 cycles
+11: falling	= 158 cycles
+12: rising	= 167 cycles
+13: falling	= 158 cycles
+14: rising	= 167 cycles
+15: falling	= 158 cycles
+16: rising	= 158 cycles
+17: falling	= 167 cycles
+18: rising	= 167 cycles
+19: falling	= 158 cycles
+ave cost = 163.400009
+```
 
 ----------------------------------------------------------------------
-### Step 8: data cache, bcm access
+### Step 11: data cache, bcm access
 
+***NOTE: stopped here, need to update further****
+
+***NOTE: stopped here, need to update further****
+
+***NOTE: stopped here, need to update further****
 
 At this point, I ran out of low-hanging fruit ideas for how to bum cycles,
 so it's time to change the rules.  Our first hack will be to use virtual
@@ -946,7 +1076,7 @@ Then I did the following:
             // 6-15
             MEM_share_dev   = TEX_C_B(    0b000,  0, 1),
 
-  3. Set the data segemtn to write-back allocate (I didn't
+  3. Set the data segments to write-back allocate (I didn't
      see a difference for write-back no allocate):
 
             // 6-15
