@@ -877,7 +877,28 @@ This gives a great performance improvement:
    2. With icache on about 166 cycles.
 Which is more than 10x faster than our originally!
 
-***NOTE: have to replicate the numbers: check back!***
+```
+rising = 256 cycles
+falling = 288 cycles
+rising = 272 cycles
+falling = 288 cycles
+rising = 272 cycles
+falling = 287 cycles
+rising = 272 cycles
+falling = 288 cycles
+rising = 261 cycles
+falling = 291 cycles
+rising = 270 cycles
+falling = 288 cycles
+rising = 270 cycles
+falling = 291 cycles
+rising = 267 cycles
+falling = 288 cycles
+rising = 270 cycles
+falling = 288 cycles
+rising = 272 cycles
+falling = 288 cycles
+```
 
 ----------------------------------------------------------------------
 ### Step 7: Icache.
@@ -1033,7 +1054,7 @@ instruction.  Use it!
 With the cache on it got around 98 cycles!
 
 ```
-
+icache on
 0: rising = 268 cycles
 1: falling = 99 cycles
 2: rising = 108 cycles
@@ -1054,12 +1075,9 @@ With the cache on it got around 98 cycles!
 17: falling = 98 cycles
 18: rising = 98 cycles
 19: falling = 98 cycles
-jump in fiq II
-FIQ defined
-gpio-int.c:282: test cost:
-    cycles=3922
-    dcache miss=0
-    icache miss=5
+
+
+icache off
 0: rising = 104 cycles
 1: falling = 104 cycles
 2: rising = 104 cycles
