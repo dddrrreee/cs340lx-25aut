@@ -1072,9 +1072,9 @@ sure the identity map worked.
 
 Then I did the following:
   1. Set the write-back functionality in the cp 15 control register 1
-     (the 4th bit, see 3-45).
+     (the 4th bit, see chapter 3, page 3-45, in the arm1176 manual).
 
-  2. Set the memory attribute for the bcm mapping (see `mem-attr.h`) to:
+  2. Set the memory attribute for the BCM mapping (see `mem-attr.h`) to:
 
             // 6-15
             MEM_share_dev   = TEX_C_B(    0b000,  0, 1),
