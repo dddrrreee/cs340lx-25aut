@@ -620,32 +620,32 @@ each and making sure that they are divisible by 32.
 Alignment made about 30 cycles difference for me.  It might make more
 or less for you --- this variance is why we did this change :).
 
-More importantly it reduces fluctuations later when we cut more cycles.
-(And as foreshadowing: at some point I accidently deleted (3) above,
-and when it gets added back, variance was significantly reduced.)
+And as foreshadowing: at some point I accidently deleted (step 3) above,
+and wasted a lot of time chasing something that was just an artificial
+slowdown because of a alignment issue.
 
 ```
-0: rising	= 713 cycles
+0: rising	= 666 cycles
 1: falling	= 549 cycles
 2: rising	= 546 cycles
-3: falling	= 546 cycles
-4: rising	= 549 cycles
-5: falling	= 544 cycles
-6: rising	= 546 cycles
-7: falling	= 555 cycles
-8: rising	= 558 cycles
+3: falling	= 549 cycles
+4: rising	= 546 cycles
+5: falling	= 549 cycles
+6: rising	= 544 cycles
+7: falling	= 549 cycles
+8: rising	= 547 cycles
 9: falling	= 549 cycles
-10: rising	= 630 cycles
-11: falling	= 549 cycles
-12: rising	= 558 cycles
-13: falling	= 555 cycles
-14: rising	= 546 cycles
-15: falling	= 549 cycles
-16: rising	= 555 cycles
-17: falling	= 555 cycles
-18: rising	= 549 cycles
-19: falling	= 549 cycles
-ave cost = 562.500000
+10: rising	= 546 cycles
+11: falling	= 558 cycles
+12: rising	= 555 cycles
+13: falling	= 549 cycles
+14: rising	= 558 cycles
+15: falling	= 546 cycles
+16: rising	= 549 cycles
+17: falling	= 544 cycles
+18: rising	= 546 cycles
+19: falling	= 552 cycles
+ave cost = 554.850036
 ```
 
 ----------------------------------------------------------------------
@@ -692,7 +692,7 @@ If you look at the interrupt handler we've removed one instruction.
 ```
 
 
-This gives us a modest speedup from 562 cycles to 549.  However,
+This gives us a modest speedup from 552 cycles to 549.  However,
 importantly, it makes the next change we do easier.
 
 ```
@@ -734,13 +734,9 @@ be great if you do!
 ----------------------------------------------------------------------
 ### Step 5: do it all in assembly
 
-***NOTE: if you see this do a pull***
-
-***NOTE: if you see this do a pull***
-
-***NOTE: if you see this do a pull***
-
-***NOTE: if you see this do a pull***
+One big overhead: all the extra instructions used by the interrupt
+trampoline (`interrupt-asm.S:interrupt`) to save and restore registers
+before calling `int_vector`.    We now get rid of this.
 
 One nice thing about trimming so many instructions is that now the
 interrupt handler machine code is tiny, which means we can easily just
@@ -752,7 +748,7 @@ but in this case it lets us:
      optimize across the boundaries.  We've already seen how this 
      helps the compiler, but it also helps hand optimization.
   2. Once we've done step 1, we can then play games with the registers
-     that the C compiler can't necessarily.  
+     that the C compiler can't necessarily. 
 
         - NOTE: the `arm-none-eabi-gcc` compiler does let you tag
           exception routines with an attribute specifying what exception
@@ -762,50 +758,28 @@ but in this case it lets us:
           this impossible (afaik, but I didn't ponder long).
 
 
-Before doing the change, the disasembly of my entire C interrupt handler
-looks like:
-
 ```
-    80a0:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
-    80a4:   e4830004    str r0, [r3], #4
-    80a8:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
-    80ac:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
-    80b0:   e3a02302    mov r2, #134217728  ; 0x8000000
-    80b4:   e5832000    str r2, [r3]
-    80b8:   e12fff1e    bx  lr
+00008060 <int_vector>:
+    8060:   e3a03001    mov r3, #1
+    8064:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
+    8068:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
+    806c:   e3a02302    mov r2, #134217728  ; 0x8000000
+    8070:   e5832000    str r2, [r3]
+    8074:   e12fff1e    bx  lr
 ```
 
 To do the change, I took most of this code and:
-  1. Put it all in the assembly trampoline (not the "bx lr").
-  2. Messed around with the instructions to cut some out and 
-     to do everything only using two registers in addition to 
-     SP.
+  1. Put all the instructions other than the 
+     "bx lr" in the assembly trampoline 
+     `interrupt-asm.S:interrupt`
+  2. To reduce the need to save and restore registers, 
+     I abused the sp register (recall: the interrupt handler
+     has a private shadow copy) as a general purpose register.
   3. After (2): Only saved and restored the two registers.
 
-As you can see, removing the memory operations makes a big difference!
 
-```
-int cost = 560 [314 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 380 [196 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [199 from gpio write until cycle_cnt_read()]
-int cost = 382 [198 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-int cost = 380 [196 from gpio write until cycle_cnt_read()]
-int cost = 388 [198 from gpio write until cycle_cnt_read()]
-```
+***NOTE: need to fill in these numbers.***
+
 
 NOTE:
   - One easy change we could have done earlier but didn't
@@ -821,12 +795,15 @@ NOTE:
 ----------------------------------------------------------------------
 ### Step 6: do it as a "fast interrupt" (FIQ)
 
-Looking at the machine code, we still push an pop two registers,
-which means we have to have a stack pointer, as well as some 
-extra management.    We can eliminate all of this by using  
-"fast interrupt" mode.  If you look in chapter 4 of the
-armv6 document you can see that FIQ mode has six shadow
-registers, R8-R14.
+***NOTE: at this point I'm still adding stuff.  The rest of the lab
+just has high bits.  Will add more writing.  Tuesday's lab will
+just be continuing the quest.***
+
+Looking at the machine code, we still push a couple of registers, which
+means we have to have a stack pointer, as well as some extra management.
+We can eliminate all of this by using "fast interrupt" mode.  If you
+look in chapter 4 of the armv6 document you can see that FIQ mode has
+six shadow registers, R8-R14.
 
 <img src="images/shadow-regs-pA2-5.png" width="450" />
 
@@ -845,7 +822,6 @@ Since we want one of the first 32 GPIO pins, this is GPIO0, which is 49.
 
 There's different ways to do this.  The easiest way for me was to make
 versions of my gpio interrupt routines that setup the FIQ instead.
-
 
     void gpio_fiq_rising_edge(unsigned pin);
     void gpio_fiq_falling_edge(unsigned pin);
@@ -896,169 +872,25 @@ to 5 instructions:
      a pointer to the next timer reading (more on this later).
   5. a jump back to the interrupted code.
 
-This gives us a decent but not fantastic performance bump given the
-massive surgery:
+This gives a great performance improvement: 
+   1. Without icache on: around 290 cycles.
+   2. With icache on about 166 cycles.
+Which is more than 10x faster than our originally!
 
-```
-int cost = 326 [149 from gpio write until cycle_cnt_read()]
-int cost = 294 [154 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 291 [151 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 322 [145 from gpio write until cycle_cnt_read()]
-int cost = 294 [153 from gpio write until cycle_cnt_read()]
-int cost = 322 [145 from gpio write until cycle_cnt_read()]
-int cost = 283 [142 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 322 [145 from gpio write until cycle_cnt_read()]
-int cost = 294 [154 from gpio write until cycle_cnt_read()]
-int cost = 321 [145 from gpio write until cycle_cnt_read()]
-int cost = 294 [154 from gpio write until cycle_cnt_read()]
-```
-
-The variance in costs was weird, so I looked into the code and somehow
-I'd deleted the align 5 in the test gen code.  (The great thing about
-using perforance counters is that there is no room to hide.  Also, the
-more details you see, the more you have a chance to see "that's weird").
-
-When I fixed this, the variance went very flat after the first couple
-readings, justifying why we intended to do it in the first place :)
-
-```
-int cost = 295 [154 from gpio write until cycle_cnt_read()]
-int cost = 306 [166 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 292 [151 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [157 from gpio write until cycle_cnt_read()]
-int cost = 292 [151 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [157 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [157 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [156 from gpio write until cycle_cnt_read()]
-int cost = 297 [157 from gpio write until cycle_cnt_read()]
-```
-
-NOTE:
-  - we still have the initial jitter, will look at pretty
-    soon after we run out of stuff to do.
-
-OH: guess: the initial bump is b/c of random cache replacement.
-once you get a second shot it settles down?   use the performance
-counters to narrow down.
-
-We are now at more than 10x a performance improvement.  And, crucially
-for a digital scope, almost always 1 cycle or less in variance (I'm
-still not sure why the initial readings bounce around so much).
+***NOTE: have to replicate the numbers: check back!***
 
 ----------------------------------------------------------------------
 ### Step 7: Icache.
 
-This is easy.  We turn on the icache.  This make a big difference
-in performance, but also increases variance:
+This is easy.  We turn on the icache and write the code to measure
+both with and without.
 
-```
-int cost = 247 [138 from gpio write until cycle_cnt_read()]
-int cost = 170 [97 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 141 [72 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 141 [72 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-int cost = 147 [75 from gpio write until cycle_cnt_read()]
-int cost = 142 [70 from gpio write until cycle_cnt_read()]
-```
-
-The first miss we can eliminate by either doing a warmup or a prefetch.
-While we've brough down the time, we also increased the initial cache
-read variance --- interesting!  Worth looking into.
-
-----------------------------------------------------------------------
-### Now what?
-
-We are currently at about 23x performance improvement (3500/147 = 23.8) and
-about 7x improvement of accuracy (529/75 = 7.05), which is a great improvement.
-It gives almost 5M samples / second:
-
-        (700M cycles / sec)  / (147 cycles per sample)
-    =   4,929,577 samples per second.
-
-
-we should be using performance counters to narrow things down, but 
-currently we are on a "just cut things out" warpath that is working
-well.  when we get stuck we will pull in the PMU code  so we can see
-what is going on.
-
-
-This is one of the reasons I really like the bare metal code we do:
-  1. It would be hopeless to do this lab in Linux or MacOS.  The 
-     time, the constant fight, the complexity.  And in the end, it just
-     wouldn't work.  Big NFW.
-  2. Since the code is small, and written by us, it's easy to quickly get
-     into a flow state, directly touching hardware reality, doing
-     interesting things.  That's not the norm.
-        
-        don't have to wrry: will this change break other code?  there
-        is no other code.
-
-
-Fair enough, so now what.
-
-There's still some obvious stuff we can do or at least try:
-  1. Overclock the pi.  We can push the CPU higher and also the 
-     BCM speed (IIRC), though we then have to adjust the UART or
-     we won't see anything.
-  2. We could possibly use the DMA to clear the event and write the
-     cycle count out.   Given some prep work I think we can do this with
-     a single store.   A nice thing about this approach is that we could
-     then efficiently extend it to multiple pins: use DMA to read and then
-     write out the GPIO level register.
-
-  3. One potential method: turn on VM and do traps of the GPIO memory.
-     This *might* be faster + lower variance for getting the initial
-     cycle count read since it doesn't go through the bcm at all, which
-     runs at 250mhz).  We could alias the GPIO memory at a different
-     offset so we can just write to it without having to play domain
-     tricks.
-
-  4. We could get a cleaner test signal by using the clock to generate
-     it.  This would require checking when we have too many samples.
-     A hack to do this without an if statement is to set a watchpoint
-     on the end of the queue.
-
-  5. We'll give a major extension if you make a significant improvement
-     using some alternative method!
-
-Note: I did try to not use the interrupt vector and copy the interrupt
-code but it didn't seem to improve anything.
+As usual we have a large cost for the first value --- we can eliminate
+this by either doing a warmup or a prefetch.
 
 ----------------------------------------------------------------------
 ### Step 8: data cache, bcm access
+
 
 At this point, I ran out of low-hanging fruit ideas for how to bum cycles,
 so it's time to change the rules.  Our first hack will be to use virtual
@@ -1099,131 +931,157 @@ Then I did the following:
             // 6-15
             MEM_wb_alloc   =  TEX_C_B(    0b001,  1, 1),
 
+I got it down to about 140:
 
-If you look at the disassembled machine code for your interrupt handler,
-it does not access the stack or data segment.  So our initial plan is
-to leave these uncached to try to ensure that the data cache doesn't
-get polluted.  It's possible that enabling the cache for these might
-speed up the test generation, but we ignore it for now.
+```
+0: rising = 141 cycles
+1: falling = 142 cycles
+2: rising = 141 cycles
+3: falling = 142 cycles
+4: rising = 141 cycles
+5: falling = 142 cycles
+6: rising = 141 cycles
+7: falling = 142 cycles
+8: rising = 141 cycles
+9: falling = 142 cycles
+10: rising = 141 cycles
+11: falling = 142 cycles
+12: rising = 141 cycles
+13: falling = 142 cycles
+14: rising = 141 cycles
+15: falling = 142 cycles
+16: rising = 141 cycles
+17: falling = 142 cycles
+18: rising = 141 cycles
+19: falling = 142 cycles
+```
 
+----------------------------------------------------------------------
+### Step 9: goto
 
-    When writing to the log, if the data cache is on and:
-      1. The pages holding the log have their page attributes set to 
-         "write back" (see Table 6-2, p 6-15).
-      2. And set in the cp15 reg 1 register.
-     then the code will not be blocked while the value is
-     written to memory.  Because the cache line is 32  bytes, it *appears*
-     that this will only give us a win when the data is in the data so 
-     we will have to "prefetch" it in by reading it before running
-     the timing tests.
-
-
-
---------------------------------------------------------------------------
-
-Slept on, couple easy ones:
-  - get rid of the redundant computation of the tail [?]
-  - clean up the test generation using outlining (eventually clock)
-  - turn on VM and mess with the device memory rules.
-    
-Ah:
-  - can clean up the test gen by using a clock.
-  - use watchpoints to put a limit on the number of entries.
-  - can't do ws2812b: so do virtual time to correct.
-  - make a utility --- change your registers entirely and keep
-     everything in them.
-  - maybe do dma as a generator?  nice since can do uneven.
-    can also do pwm.  "all the different ways to precisely
-    write gpio pins" is equiv to all the different ways to 
-    blink led i think
-
-  - for output: can do virtual.  if need output: buffer everything 
-      (no interrupt) replay when done.
-
-  - for a utility: can entirely twist things around and have the
-    user just have 1 register and the interrupt have all the others.
-
-  use of this lab:
-    can we make a record replay?  do this for external devices.
-    should be able to cause the code to emit exactly the same output.
-
---------------------------------------------------------------------
---------------------------------------------------------------------
-all the stuff we used:
- 1. interrupts.
- 2. FIQ interrupts
- 3. scratch registers.
- 4. looking at machine code.
- 5. understanding the machine 
- 6. virtual memory.
- 7.
---------------------------------------------------------------------
---------------------------------------------------------------------
---------------------------------------------------------------------
-LEft over text.  Ignore.
-
-### Why?
-
-We spent a fair amount of time trying to tune our addressable light array
-code, focusing on micro-benchmarks.   However, these microbenchmarks
-don't guarantee that when you compose the code together that its timing
-stays what we need it to be. Unfortunately ours does not: if you look at
-your code, there are if-statements, loops, and other sources of overhead
-that will push all our timings up.  The true test of the code is what happens
-on the jumper that connects the pi to the light array:  
-  - Does the jumper go to 1 (3v) when it should, and for the right number of
-    nanoseconds?
-  - Does it go 0 when it should, and for the right number of nanoseconds?
-
-Whatever happens inside the pi is one thing, but what happens on the outside
-is what happens in reality.     Today you'll build a fast interrupt based
-digital scope that can check these timings.  Historically we have used two
-pi's to do this:
-  1. A test pi running code we want to check, such as the ws2812b code.
-  2. A scope pi connected by jumpers to (1) that records when the
-     output from the test pi goes hi or low and at what time.  Ideally
-     we have error in the low number of nanoseconds.  Note: given the 
-     pi runs at 700mhz and a pi cycle is 1.4ns we can't do better than
-     that.  
-
-The downside of this approach is cost (we have to buy equipment) and,
-worse, it's more than 2x the annoyance to get 2 pi's working on your
-laptop and coordinating them.
-
-So we'll start with a single pi:
-  1. Connect a loopback jumper from an output GPIO pin (the test signal) 
-     to an input GPIO pin (the scope input).
-  2. Setup GPIO interrupts so we get an interrupt when the input pin
-     goes from hi to low.
-
-Because of the complexity they introduce, I'm much more blackpilled than
-most on using interrupts at all.  Our group has made a reasonable amount
-of money because people can't even write sequential code correctly.
-Adding interrupts makes it much worse.
-
-HOWEVER, this is one case where interrupts let us reduce error.  On our
-arm1176 handling a GPIO interrupt is much more expensive than simply
-reading a GPIO pin.  There is a lot that happens from the initial action
-of a GPIO pin switching from low to high (or high to low) all the way
-until the first instruction in interrupt.  But (and this is key), all
-of these actions occur in hardware and --- at least for the arm1176 ---
-appear to follow a deterministic, predicatable path with stable timing.
+Currently the test code spins in a loop waiting for the interrupt handler
+to set a global register.  The cost of this read, check, and branch 
+will always be added to the cost of the interrupt.  We can get rid of
+it with slighly a weird trick.  Rewrite the code to *not* check for 
+an interrupt, but instead write a continuation address to a location
+that the interrupt handler can jump to when it returns.  
+This means the code does not have to check anything but will run
+immediately.
 
 
+So instead of:
+```
+        let f = n_int_get();
+        c = cycle_cnt_read();
+        gpio_set_off_raw(pin);
+        while(!n_int_get())
+            ;
+        e = cycle_cnt_read();
+```
+
+We do something like this pseudo-code: 
+```
+        c = cycle_cnt_read();
+        gpio_set_off_raw(pin);
+        while(1)
+            ;
+        resume_label:
+            e = cycle_cnt_read();
+```
+And have the interrupt handler jump to the resume label always.
 
 
-a GPIO pin was written until the GPIO pin was
+This got me down to:
 
 
-I'm generally down on using interrupts unless you have to.
+```
+0: rising = 159 cycles
+1: falling = 114 cycles
+2: rising = 132 cycles
+3: falling = 112 cycles
+4: rising = 113 cycles
+5: falling = 112 cycles
+6: rising = 113 cycles
+7: falling = 112 cycles
+8: rising = 113 cycles
+9: falling = 112 cycles
+10: rising = 113 cycles
+11: falling = 112 cycles
+12: rising = 113 cycles
+13: falling = 112 cycles
+14: rising = 113 cycles
+15: falling = 112 cycles
+16: rising = 113 cycles
+17: falling = 112 cycles
+18: rising = 113 cycles
+19: falling = 112 cycles
+```
+
+----------------------------------------------------------------------
+### Step 10: async GPIO
+
+If you notice we are using sync GPIO events, we can switch to async
+for a couple cycles.
+
+----------------------------------------------------------------------
+### Step 11: wait for interrupt
+
+If you search in chapter 3 you see there is a "wait for interrupt"
+instruction.  Use it!
 
 
+With the cache on it got around 98 cycles!
 
-A digital scope --- detecting when the signal goes high and low and for
-how many nanoseconds,
+```
 
+0: rising = 268 cycles
+1: falling = 99 cycles
+2: rising = 108 cycles
+3: falling = 98 cycles
+4: rising = 98 cycles
+5: falling = 98 cycles
+6: rising = 98 cycles
+7: falling = 98 cycles
+8: rising = 98 cycles
+9: falling = 98 cycles
+10: rising = 98 cycles
+11: falling = 98 cycles
+12: rising = 98 cycles
+13: falling = 98 cycles
+14: rising = 98 cycles
+15: falling = 98 cycles
+16: rising = 98 cycles
+17: falling = 98 cycles
+18: rising = 98 cycles
+19: falling = 98 cycles
+jump in fiq II
+FIQ defined
+gpio-int.c:282: test cost:
+    cycles=3922
+    dcache miss=0
+    icache miss=5
+0: rising = 104 cycles
+1: falling = 104 cycles
+2: rising = 104 cycles
+3: falling = 104 cycles
+4: rising = 104 cycles
+5: falling = 104 cycles
+6: rising = 104 cycles
+7: falling = 104 cycles
+8: rising = 104 cycles
+9: falling = 104 cycles
+10: rising = 104 cycles
+11: falling = 104 cycles
+12: rising = 104 cycles
+13: falling = 104 cycles
+14: rising = 104 cycles
+15: falling = 104 cycles
+16: rising = 104 cycles
+17: falling = 104 cycles
+18: rising = 104 cycles
+19: falling = 104 cycles
+```
 
-it seens the right signal at the 
-
-However, the true test of the code
-is if it sends the signals at the right time.  This 
+***NOTE: at this point I'm still adding stuff.  The rest of the lab
+just has high bits.  Will add more writing.  Tuesday's lab will
+just be continuing the quest.***
