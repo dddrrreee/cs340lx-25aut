@@ -762,15 +762,11 @@ Advantages:
     8074:   e12fff1e    bx  lr
 ```
 
-
-I did the change in two steps to make it easier to check correctness.
-  1. inline the assembly, but still s
-
 To do the change, I took most of this code and:
   1. Inlined all the assembly instructions other than the 
      "bx lr" in the assembly trampoline `interrupt-asm.S:interrupt`
-  2. Cut down the registers saved and restored to just those needed
-     (two).
+  2. Cut down the registers saved and restored to just the two the code
+     needed.
 
 After doing so I got almost a 40% improvement!
 
@@ -822,9 +818,9 @@ default_vec_ints:
     b interrupt_inline
 ```
 
-However since we don't use FIQs (yet), there is no other code below
-this last entry --- we can just place the interrupt handler there
-directly, eliminating the jump.
+However since we don't use FIQs (yet), there is no other code below this
+last entry (`b interrupt_inline`) --- we can just place the interrupt
+handler there directly, eliminating the jump.
 
 After I do all this, I get the machine code:
 ```
@@ -846,8 +842,7 @@ After I do all this, I get the machine code:
     8398:   e25ef004    subs    pc, lr, #4
 ```
 
-With a nice speedup for not thinking hard:
-
+Not a bad speedup for not thinking hard:
 ```
 0: rising	= 368 cycles
 1: falling	= 327 cycles
@@ -883,17 +878,18 @@ six shadow registers, (R8 through R14).
 
 <img src="images/shadow-regs-pA2-5.png" width="450" />
 
-How do we do this?  If you look at the BCM interrupt chapter (see
-lab 4 "interrupts" and lab 8 "device interrupts" of 140e), you can 
-see how to set up the FIQ.
+How do we do this?  If you look at the BCM interrupt chapter you
+can see how to set up the FIQ.  For a discussion of this chapter
+and device interrupts (though not FIQ) see 140e's [lab 8 "device
+interrupts"](https://github.com/dddrrreee/cs140e-25win/tree/main/labs/8-device-int).
 
 The FIQ reg itself:
 <img src="images/fiq-reg-p116.png" width="450" />
 
-So we have to set the 7th bit to 1 and write the interrupt
-source into the lower 6 bits.  The interrupt source is
-given in:
+So we have to set the 7th bit to 1 and write the interrupt source into
+the lower 6 bits.  The interrupt source is given in:
 <img src="images/irq-table-p113.png" width="450" />
+
 Since we want one of the first 32 GPIO pins, this is GPIO0, which is 49.
 
 There's different ways to do this.  The easiest way for me was to make
@@ -902,8 +898,12 @@ versions of my gpio interrupt routines that setup the FIQ instead.
     void gpio_fiq_rising_edge(unsigned pin);
     void gpio_fiq_falling_edge(unsigned pin);
 
-And use these during setup.  I also made a special FIQ table, and an 
-FIQ initialization routine in assembly.  
+    void gpio_fiq_async_rising_edge(unsigned pin);
+    void gpio_fiq_async_falling_edge(unsigned pin);
+
+And use these during setup.  I also made a special FIQ table, and an FIQ
+initialization routine (called from `test_cost`) in assembly to initialize
+the FIQ registers.
 
 So `notmain` becomes:
 
@@ -918,8 +918,6 @@ So `notmain` becomes:
 
         gpio_fiq_rising_edge(in_pin);
         gpio_fiq_falling_edge(in_pin);
-
-        fiq_init();
 ```
 
 To initialize the FIQ registers I used the `cps` instruction to switch
@@ -944,14 +942,17 @@ registers "variable names" to reduce stupid mistakes.
     #define one         r10
 ```
 
-After rewriting the code to exploit the FIQ registers, I got it down
-to 3 instructions:
+After rewriting the interrupt code to exploit the FIQ registers, I got
+it down to 3 instructions:
   1. One store to clear the event.
   2. One coprocessor move to indicate the interrupt occured
   3. One instruction to jump back to the interrupted code.
 
 This gives a great performance improvement: average 268 cycles.  Which is
-almost 12x faster than our original code!
+almost 12x faster than our original code!  A cost that brings us up to
+to about 2.6 *million* interrupts per second!  (700M cycles per sec /
+267 cycles = 12.6M.)
+
 ```
 0: rising	= 255 cycles
 1: falling	= 272 cycles
@@ -1007,9 +1008,11 @@ caches on
 ave cost = 167.750000
 ```
 
-As usual we have a large cost for the first value --- we can eliminate
-this by either doing a warmup or a prefetch (see chapter 3 of the
-arm1176 manual).  You can see this by running the code again:
+As usual we have a large cost for the first value. We can eliminate
+this by either doing a warmup or a doing a prefetch into the icache
+(see chapter 3 of the arm1176 manual).  You can see this by running the
+code again:
+
 ```
 0: rising	= 158 cycles
 1: falling	= 158 cycles
