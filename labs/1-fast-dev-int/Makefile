@@ -1,4 +1,4 @@
-SUBDIRS= 
+SUBDIRS= code
 
 .PHONY: all check clean
 all check clean: $(SUBDIRS)
