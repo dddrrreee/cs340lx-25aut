@@ -357,7 +357,7 @@ We stated above you should look at your interrupt routine
 Our main goal is to make this shorter.  
 
 If you look at the machine code, there's a bunch of loads (we get rid
-of these next), and a conditional (`tst`) where the handler does
+of these next), and a conditional (`tst`) at line 805c where the handler does
 a GPIO read and checks its value to determine whether to increment the
 rising or falling edge counter.
 
@@ -418,7 +418,7 @@ ave cost = 901.200012
 ```
 
 ----------------------------------------------------------------------
-### Fun weirdness
+#### Timing weirdness
 
 You interrupt handler can look like:
 
@@ -513,12 +513,15 @@ manual) below gives the instructions.
 </p>
 
 You can steal your old code for definition the accessors for these
-registers.  I used the `cp_asm_raw` helpers:
+registers.  I used the `cp_asm_raw` helper macros:
 
     #include "asm-helpers.h"
     cp_asm_raw(cp15_scratch2, p15, 0, c13, c0, 3)
     cp_asm_raw(cp15_scratch1, p15, 0, c13, c0, 2)
 
+Which you'll recall from 140e and 240lx define "get" and "set" methods
+with the name given as the first argument (e.g., `cp15_scratch2_get`
+to read the global register and `cp15_scratch2_set` to set it).
 
 How to change the code to use the global registers:
   1. Store the GPIO event clear address into one scratch register.
@@ -536,9 +539,11 @@ this one change removed the two loads we wanted, and also removed the
 store to `n_interrupt`.
 ```
 00008050 <int_vector>:
+                        ; increment <n_interrupt>
     8050:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
     8054:   e2833001    add r3, r3, #1
     8058:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
+                        ; clear the gpio event
     805c:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
     8060:   e3a02302    mov r2, #134217728  ; 0x8000000
     8064:   e5832000    str r2, [r3]
@@ -597,7 +602,7 @@ We care about:
   2. The interrupt handler itself: as with the interrupt trampoline
      we want all prefetched instructions to be useful.  We add a GCC
      attribute directive before the start of the interrupt code in the
-     `scope.c` file:
+     `gpio-int.c` file:
 
             __attribute__((aligned(32))) void int_vector(uint32_t pc) 
             {
@@ -617,7 +622,7 @@ We care about:
             gpio_set_on_raw(pin);
 
 You can check that all of these worked by looking for the addresses of
-each and making sure that they are divisible by 32.
+each in the `.list` file and making sure that they are divisible by 32.
 
 Alignment made about 30 cycles difference for me.  It might make more
 or less for you --- this variance is why we did this change :).
@@ -651,7 +656,7 @@ ave cost = 554.850036
 ```
 
 ----------------------------------------------------------------------
-### Step 6: get rid of interrupt counter read
+### Step 6: don't count interrupts
 
 As mentioned above, speeding up code means constantly mulling over the
 question "can I get the same result by doing less?"
@@ -661,9 +666,8 @@ If you look at your interrupt code, the answer is yes:
     reading and then writing the counter), we just care that an interrupt
     happened (this requires a single set).
   - So change the test code to set the interrupt register to 0 before
-    spinning (wait for it to become non-zero) and the interrupt to set
+    spinning (wait for it to become non-zero) and change the interrupt to set
     it to 1.
-
 
 For example in `test_cost`:
 ```
@@ -680,7 +684,6 @@ For example in `test_cost`:
 Note: we put the `n_int_set` before the alignment since the operation to
 set it to zero is not important for speed.  Interestingly: If I didn't
 do this I didn't get any speedup.
-
 
 If you look at the interrupt handler we've removed one instruction.
 ```
@@ -727,8 +730,18 @@ ave cost = 546.650024
 
 One big overhead: all the extra instructions used by the interrupt
 trampoline (`interrupt-asm.S:interrupt`) to setup the machine state so
-that it can call the C handler (`int_vector`).  Especially costly: The
-loads and stores used to save/restore registers.  
+that it can call the C handler (`int_vector`):
+```
+interrupt:
+        sub   lr, lr, #4               @ correct interrupt pc
+        mov sp, #INT_STACK             @ load the stack pointer
+        push  {r0-r12,lr}              @ push all regs (trim this to caller)
+        mov   r0, lr                   @ pass exception pc as arg0
+        bl    int_vector               @ call our interrupt handler.
+        pop   {r0-r12,lr}              @ pop all the regs
+        movs    pc, lr                 @ resume back at exception location
+```
+Especially costly: The loads and stores used to save/restore registers.
 We now get rid of much of this overhead.
 
 One nice thing about trimming so many instructions is that now the
@@ -737,7 +750,7 @@ write it directly in assembly code and inline it into the trampoline
 code.  (This dynamic is not uncommon!) 
 
 Advantages:
-  1. Inline the C interrupt handler into the assembly trampoline removes
+  1. Inlining the C interrupt handler into the assembly trampoline removes
      the jump to (and return from C code).  Removing the control
      flow instructions is good, and also reduces cache and prefetch
      buffer problems.   It also lets us more easily optimize across the
@@ -754,21 +767,27 @@ Advantages:
           in this case,  we're playing games with the SP that make
           this impossible (afaik, but I didn't ponder long).
 
-```
-00008060 <int_vector>:
-    8060:   e3a03001    mov r3, #1
-    8064:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
-    8068:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
-    806c:   e3a02302    mov r2, #134217728  ; 0x8000000
-    8070:   e5832000    str r2, [r3]
-    8074:   e12fff1e    bx  lr
-```
 
 To do the change, I took most of this code and:
   1. Inlined all the assembly instructions other than the 
      "bx lr" in the assembly trampoline `interrupt-asm.S:interrupt`
-  2. Cut down the registers saved and restored to just the two the code
-     needed.
+  2. Cut down the registers saved and restored to just the two my code
+     needed.  (Because we need scratch registers we still need the
+     interrupt stack.)
+
+```
+000083a0 <interrupt_inline>:
+    83a0:   e24ee004    sub lr, lr, #4
+    83a4:   e3a0d409    mov sp, #150994944  ; 0x9000000
+    83a8:   e92d000c    push    {r2, r3}
+    83ac:   e3a03001    mov r3, #1
+    83b0:   ee0d3f70    mcr 15, 0, r3, cr13, cr0, {3}
+    83b4:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
+    83b8:   e3a02302    mov r2, #134217728  ; 0x8000000
+    83bc:   e5832000    str r2, [r3]
+    83c0:   e8bd000c    pop {r2, r3}
+    83c4:   e1b0f00e    movs    pc, lr
+```
 
 After doing so I got almost a 40% improvement!
 
@@ -924,11 +943,11 @@ So `notmain` becomes:
         gpio_fiq_falling_edge(in_pin);
 ```
 
-To initialize the FIQ registers I used the `cps` instruction to switch
-into `FIQ_MODE` and setup the FIQ registers to hold the pointers and
-values I want, and then used `cps` to switch back to `SUPER_MODE` (make
-sure you prefetch flush after each `cps`!).  I then put a panic in the
-original `int_handler` to verify we weren't calling it.
+Before running the test code, I initialize the FIQ registers by using the
+`cps` instruction to switch into `FIQ_MODE` and setup the FIQ registers to
+hold the pointers and values I want, and then used `cps` to switch back to
+`SUPER_MODE` (make sure you prefetch flush after each `cps`!).  I then
+put a panic in the original `int_handler` to verify we weren't calling it.
 
 And finally as a hack I used the preprocessor to give the different
 registers "variable names" to reduce stupid mistakes.
@@ -948,9 +967,16 @@ registers "variable names" to reduce stupid mistakes.
 
 After rewriting the interrupt code to exploit the FIQ registers, I got
 it down to 3 instructions:
-  1. One store to clear the event.
-  2. One coprocessor move to indicate the interrupt occured
-  3. One instruction to jump back to the interrupted code.
+```    
+    841c:   e5889000    str r9, [r8]
+    8420:   ee0daf70    mcr 15, 0, sl, cr13, cr0, {3}
+    8424:   e25ef004    subs    pc, lr, #4
+```    
+
+These are:
+  1. 841c: One store to clear the event.
+  2. 8420: One coprocessor move to indicate the interrupt occured
+  3. 8424: One instruction to jump back to the interrupted code.
 
 This gives a great performance improvement: average 268 cycles.  Which is
 almost 12x faster than our original code!  A cost that brings us up to
@@ -981,7 +1007,7 @@ to about 2.6 *million* interrupts per second!  (700M cycles per sec /
 ave cost = 267.800018
 ```
 
-#### Interesting weird
+#### Interesting weird timing
 
 In the FIQ interrupt handler we:
   1. Write to the clear event GPIO address to clear the interrupt.
@@ -1032,7 +1058,7 @@ this by either doing a warmup run (try it and see!) or a doing a prefetch
 into the icache.  
 
 
-#### Interesting weird
+#### Interesting weird timing
 
 One interesting thing: if you turn off the branch target cache, the
 variance appears flattens significantly after the first couple of runs.
@@ -1091,8 +1117,9 @@ My C code looks like:
         e = cycle_cnt_read();
 ```
 
-If you look at the measurement code's assembly, it should look something
-like the following (note your code addresses will be different!);
+If you look at the measurement code's assembly in `gpio-int.list`, it
+should look something like the following (note your code addresses will
+be different!);
 ```
     8168:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
     816c:   e3530000    cmp r3, #0
@@ -1250,17 +1277,16 @@ ave cost = 111.050003
 
 (Other than using virtual memory, which we do next.)
 
-(Somewhat lower-rent than the old physicist method of the three Bs for
-insight --- "bed, bath, bus.")
 
-At this point I was stuck for a couple days on how to cut any more
-cycles.  And then while in the shower remembered reading about a "wait
-for interrupt" instruction in chapter 3 of the arm1176 manual (see page
-3-85).  At the time it seemed to be about low power, so I'd ignored it.
-But desperate times.
+At this point I was stuck for a couple days on how to cut any more cycles
+without using virtual memory.  And then while in the shower remembered
+reading about a "wait for interrupt" instruction in chapter 3 of the
+arm1176 manual (see page 3-85).  At the time it seemed to be about low
+power, so I'd ignored it.  But desperate times!
 
+Dropping it in was a happy event that  lowered the cost to 104 cycles
+with the icache on:
 
-Dropping it in, we got to 104 cycles with the icache on:
 ```
 0: rising	= 159 cycles
 1: falling	= 104 cycles
@@ -1284,28 +1310,35 @@ Dropping it in, we got to 104 cycles with the icache on:
 19: falling	= 104 cycles
 ave cost = 106.750000
 ```
+
+My speculation for the improvement: during normal execution the CPU is 
+computing a bunch of state. When an interrupt happens, this state either
+must be saved or rolled back --- both are costly.  Wait for interrupt
+puts in in a quiescent state where nothing else is going on.  When
+the interrupt happens the CPU can jump right to the interrupt handler.
+
 ----------------------------------------------------------------------
 ### Step 14: data cache, bcm access
 
 At this point, I ran out of low-hanging fruit ideas for how to bum cycles,
-so it's time to change the rules.  Our first hack will be to use virtual
-memory to speed things up.   It sounds counter-intuitive that adding
-an extra layer of machinery helps speed in any way, but on the arm1176
-virtual memory gives us (at least) two ways to speed up our code:
+so turned on virtual memory to speed things up.   
 
-  1. With virtual memory off, the access rules for BCM memory default to
-     "strongly ordered".  If you look at the other rules (6-15) you
-     see there is also a "device shared" and a "device not shared".
-     With some simple tests, it appears that both reads and write for
-     device shared are faster than strongly ordered.  (I couldn't get
-     "device not shared" to work.)  It makes sense to exploit this.
 
-  2. With virtual memory off, the data cache is off, and each memory
-     store blocks until the write to memory completes.  Memory is slow,
-     so this is slow.  We can make stores non-blocking by enabling the
-     "write buffer" functionality in the data cache --- so that they
-     get buffered in the fixed size write buffer which later retires
-     them to memory, without requiring the store wait.
+It sounds counter-intuitive that adding an extra layer of machinery helps
+speed in any way, but on the arm1176 virtual memory gives us (at least)
+two ways to speed up our code:
+
+  1. With virtual memory off, the access rules for BCM device memory
+     kdefault to "strongly ordered".  If you look at the other rules
+     (6-15) you see there is also a "device shared" and a "device
+     not shared".  With some simple tests, it appears that both reads
+     and write for device shared are faster than strongly ordered.
+     (I couldn't get "device not shared" to work.)  It makes sense to
+     exploit this.
+
+  2. With virtual memory off, the data cache is off.  Memory is slow,
+     so this is slow.  
+
 
 #### How to implement 
 
@@ -1388,15 +1421,16 @@ FIQ defined
 ### Step 15: instruction prefetching
 
 An obvious way to speed up code is cutting out instructions.  A less
-obvious method is to reduce interference between the code.  In our code:
+obvious method is to reduce interference between different parts of code.  
+In our code:
   1. We are running the timing loop over and over, which should bring it 
      in the instruction cache.
   2. However: we are also printing times on each measurement iteration.  
      Our print code is fairly large, and there is a good chance it knocks
-     out at least part of the measurement code.  
+     out at least part of the measurement and/or interrupt code.  
   3. In general such interference can happen anytime a routine A calls 
      routine B and they are far enough way that they map to the same lines
-     in the icache, causing each to knock the other out.
+     in the icache, causing each invocation to knock the other out.
 
 The general approach:
   1. Remove `printk` interference: We rewrite the measurement code to store
@@ -1412,14 +1446,14 @@ The general approach:
 
 
     The linker will link all these files in order.  You can see that the code
-    for `gpio-int.o` will be placed before `interrupt-asm.o`.  So to pack 
-    the code densely, we place `test_cost` at the end of the `gpio-int.c` file,
-    the interrupt handler and the assembly measurement routine (`measure_int_asm`)
-    at the start of `interrupt-asm.S`. 
+    for `gpio-int.o` will be placed before `interrupt-asm.o`.  So to pack
+    the code densely, we place `test_cost` at the end of the `gpio-int.c`
+    file and place the interrupt handler and the assembly measurement
+    routine (`measure_int_asm`) at the start of `interrupt-asm.S`.
 
-    You should then look at your `.list` file to see that they are right
-    next to each other.  I had to tell `gcc` to not reorder routines by 
-    adding the flag to the makefile:
+    You should then look at your `.list` file to see that these three
+    pieces are right next to each other.  I had to tell `gcc` to not
+    reorder routines by adding the flag to the makefile:
 
             CFLAGS +=  -fno-toplevel-reorder
 
@@ -1463,7 +1497,7 @@ at the end of the assembly code and could then just do:
     prefetch_inst((void*)test_cost2, prefetch_end);
 ```
 
-This changed got us down to a flat 98 except for the very first 99 cycle run:
+This change got us down to a flat 98 except for the very first 99 cycle run:
 
 ```
 0: rising = 99 cycles
@@ -1492,5 +1526,11 @@ ave cost = 98.050003
 ----------------------------------------------------------------------
 ### Now what?
 
-At this point I'm out of ideas other than overclocking the pi.  If you're in
-340lx and can get consistent better times I'll give you $100 :).
+At this point I'm out of ideas other than overclocking the pi.  If you're
+in 340lx and can get consistent better times I'll give you $100 :).
+
+We've improved the cost from  about 3200 cycles down to 98, roughly
+a 33x improvement.  If we could maintain these times for back to back
+interrupts, this would work out to potentially 7.1M interrupts per second:
+  - The pi runs at 700Mhz.
+  - (700M cycles / sec) / (98 cycles) = 7.1M.
