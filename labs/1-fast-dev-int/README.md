@@ -1282,9 +1282,6 @@ ave cost = 111.050003
 ----------------------------------------------------------------------
 ### Step 13: wait for interrupt
 
-(Other than using virtual memory, which we do next.)
-
-
 At this point I was stuck for a couple days on how to cut any more cycles
 without using virtual memory.  And then while in the shower remembered
 reading about a "wait for interrupt" instruction in chapter 3 of the
@@ -1320,8 +1317,8 @@ ave cost = 106.750000
 
 My speculation for the improvement: during normal execution the CPU is 
 computing a bunch of state. When an interrupt happens, this state either
-must be saved or rolled back --- both are costly.  Wait for interrupt
-puts in in a quiescent state where nothing else is going on.  When
+must be saved or rolled back --- both cost time. Wait for interrupt
+puts the CPU in in a quiescent state where nothing else is going on.  When
 the interrupt happens the CPU can jump right to the interrupt handler.
 
 ----------------------------------------------------------------------
@@ -1449,7 +1446,9 @@ The general approach:
 
      To figure out how to do this, look at the (long) link command used:
 
+```
             arm-none-eabi-ld /home/engler/class/cs340lx-25aut//libpi/staff-start.o objs/gpio-int.o  ./objs/interrupt-asm.o      -T /home/engler/class/cs340lx-25aut//libpi/memmap -o objs/gpio-int.elf /home/engler/class/cs340lx-25aut//lib/libvm-ident0.0//libvm-ident.a /home/engler/class/cs340lx-25aut//libpi/libpi.a 
+```
 
 
     The linker will link all these files in order.  You can see that the code
