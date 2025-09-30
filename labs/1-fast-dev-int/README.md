@@ -26,7 +26,7 @@ Why do we want fast interrupts?
 
 Two favorite things about the lab: 
   1. Optimizing tends to produce fun flow states.  When tuning my version
-     I was staying up til 3am and waking up thinking about hacks to cut
+     I was staying up until 3am and waking up thinking about hacks to cut
      cycles for days in a row.  When you get up to my age you'll realize
      how rare such days are :).
 
@@ -68,7 +68,7 @@ Alternatively, you can --- and are encouraged to! --- do the lab
 in two other ways:
   1. Max Mode: just take the code and optimize, ignoring the rest of
      the README.  You'll learn the Maximum amount.
-  2. Daniel mode: same, but also read the sentence or two descriptons of
+  2. Daniel mode: same, but also read the sentence or two descriptions of
      what tricks we did as a reference.  
 
 In any case, hopefully you figure out some new tricks because I would
@@ -87,7 +87,7 @@ What I would do:
   1. Have a text file where you write down what you do and then
      copy and paste the measured performance.
 
-  2. Each time you make a real improvment make a subdirectory with
+  2. Each time you make a real improvement make a subdirectory with
      a clearly sequential naming scheme and copy the entire directory 
      there.  For example, before modifying anything:
 
@@ -277,7 +277,7 @@ In general, the second easy thing to do is to inline key calls.
 This has the obvious benefit of getting rid of the procedure call and
 return overhead.  It has the secondary (sometimes much more) benefit of
 letting the compiler optimize  and specialize the function body to the
-callsite.  
+call-site.  
 
 So make inline versions of:
   1. `gpio_read`
@@ -291,7 +291,7 @@ How:
   1. I would suggest copying your old GPIO code into a new header file
      `gpio-raw.h` into this directory so you can collect all your
      inlined code and use it in other labs.
-  2. Make each routine into a `static inline` routine, with a slighly
+  2. Make each routine into a `static inline` routine, with a slightly
      altered name (e.g., `gpio_read_raw`, `gpio_set_off_raw`,
      `gpio_set_on_raw`, `gpio_event_clear_raw`).
   3. Cut out all error checking in the routines. 
@@ -586,11 +586,11 @@ housekeeping so that we don't get spurious speedups and slowdowns because
 of changing instruction alignment.  Recall that the instruction prefetch
 buffer is 32-bytes, where the first instruction address in each fetch is
 32-byte aligned.  If our code can be read in a single prefetch it will
-run noticably faster than if it takes two.  Unfortunately if we don't
+run noticeably faster than if it takes two.  Unfortunately if we don't
 force alignment, random changes in the one part of the code can cause
 cascading alignment changes in all subsequent (unrelated) code locations
 leading to big timing swings.  (We should have done this sooner, but I
-forgot and am too lazy to remeasure.)
+forgot and am too lazy to re-measure.)
 
 We care about:
   1. The interrupt trampoline: we want this 32-byte aligned so the
@@ -979,7 +979,7 @@ it down to 3 instructions:
 
 These are:
   1. 841c: One store to clear the event.
-  2. 8420: One coprocessor move to indicate the interrupt occured
+  2. 8420: One coprocessor move to indicate the interrupt occurred
   3. 8424: One instruction to jump back to the interrupted code.
 
 This gives a great performance improvement: average 268 cycles.  Which is
@@ -1015,7 +1015,7 @@ ave cost = 267.800018
 
 In the FIQ interrupt handler we:
   1. Write to the clear event GPIO address to clear the interrupt.
-  2. Set the global register to indicate the interrupt occured.
+  2. Set the global register to indicate the interrupt occurred.
 
 We can do these in either order.  My measurements above did them (1)
 and then (2).  Weirdly, if I swap the order, then the times jump up
@@ -1189,7 +1189,7 @@ Note:
     (r0-r3, r12).
 
 I then rewrote the interrupt handler:
-  1. delete the instructions to set the global regiser (yea!).
+  1. delete the instructions to set the global register (yea!).
   2. Jump to the label in register r3.
 
 With the icache on this got me down to:
@@ -1535,7 +1535,7 @@ ave cost = 98.050003
 ----------------------------------------------------------------------
 ### Now what?
 
-At this point I'm out of ideas other than overclocking the pi.  If you're
+At this point I'm out of ideas other than over-clocking the pi.  If you're
 in 340lx and can get consistent better times I'll give you $100 :).
 
 We've improved the cost from  about 3200 cycles down to 98, roughly
@@ -1543,3 +1543,8 @@ a 33x improvement.  If we could maintain these times for back to back
 interrupts, this would work out to potentially 7.1M interrupts per second:
   - The pi runs at 700Mhz.
   - (700M cycles / sec) / (98 cycles) = 7.1M.
+
+My hope is that over-clocking will let us double these numbers.  TBD!
+You can read about the mailbox interface at:
+  - [mailboxes](https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
+  - [240lx lab 1](https://github.com/dddrrreee/cs240lx-25spr/tree/main/labs/1-mailboxes)
