@@ -1548,3 +1548,6 @@ My hope is that over-clocking will let us double these numbers.  TBD!
 You can read about the mailbox interface at:
   - [mailboxes](https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
   - [240lx lab 1](https://github.com/dddrrreee/cs240lx-25spr/tree/main/labs/1-mailboxes)
+  - [Overclock flags and
+  settings](https://www.raspberrypi.com/documentation/computers/config_txt.html#overclocking-options). This is from the rpi foundation --- you'll need
+    to scroll down a bunch to get to the flags table.
