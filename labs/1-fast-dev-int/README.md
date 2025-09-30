@@ -1,8 +1,5 @@
 ## Making a fast interrupt-based digital analyzer.
 
-***NOTE: this lab is still getting written so you'll have to pull later
-sections***
-
 This is a fun lab: you'll make GPIO interrupts as fast as possible.
 If you beat the final staff numbers by a non-noise amount I'll give you
 $100 :).  
@@ -1026,9 +1023,9 @@ ave cost = 167.750000
 ```
 
 As usual we have a large cost for the first value. We can eliminate
-this by either doing a warmup or a doing a prefetch into the icache
-(see chapter 3 of the arm1176 manual).  You can see this by invoking the
-measurement code twice after enabling the cache.
+this by either doing a warmup run (try it and see!) or a doing a prefetch 
+into the icache.  
+
 
 #### Interesting weird
 
@@ -1258,64 +1255,32 @@ for interrupt" instruction in chapter 3 of the arm1176 manual (see page
 But desperate times.
 
 
-Dropping it in, there was a major difference!
-With the cache on it got around 98 cycles!
-
+Dropping it in, we got to 104 cycles with the icache on:
 ```
-icache on
-0: rising = 268 cycles
-1: falling = 99 cycles
-2: rising = 108 cycles
-3: falling = 98 cycles
-4: rising = 98 cycles
-5: falling = 98 cycles
-6: rising = 98 cycles
-7: falling = 98 cycles
-8: rising = 98 cycles
-9: falling = 98 cycles
-10: rising = 98 cycles
-11: falling = 98 cycles
-12: rising = 98 cycles
-13: falling = 98 cycles
-14: rising = 98 cycles
-15: falling = 98 cycles
-16: rising = 98 cycles
-17: falling = 98 cycles
-18: rising = 98 cycles
-19: falling = 98 cycles
-
-
-icache off
-0: rising = 104 cycles
-1: falling = 104 cycles
-2: rising = 104 cycles
-3: falling = 104 cycles
-4: rising = 104 cycles
-5: falling = 104 cycles
-6: rising = 104 cycles
-7: falling = 104 cycles
-8: rising = 104 cycles
-9: falling = 104 cycles
-10: rising = 104 cycles
-11: falling = 104 cycles
-12: rising = 104 cycles
-13: falling = 104 cycles
-14: rising = 104 cycles
-15: falling = 104 cycles
-16: rising = 104 cycles
-17: falling = 104 cycles
-18: rising = 104 cycles
-19: falling = 104 cycles
+0: rising	= 159 cycles
+1: falling	= 104 cycles
+2: rising	= 104 cycles
+3: falling	= 104 cycles
+4: rising	= 104 cycles
+5: falling	= 104 cycles
+6: rising	= 104 cycles
+7: falling	= 104 cycles
+8: rising	= 104 cycles
+9: falling	= 104 cycles
+10: rising	= 104 cycles
+11: falling	= 104 cycles
+12: rising	= 104 cycles
+13: falling	= 104 cycles
+14: rising	= 104 cycles
+15: falling	= 104 cycles
+16: rising	= 104 cycles
+17: falling	= 104 cycles
+18: rising	= 104 cycles
+19: falling	= 104 cycles
+ave cost = 106.750000
 ```
-
 ----------------------------------------------------------------------
-### Step 11: data cache, bcm access
-
-***NOTE: stopped here, need to update further****
-
-***NOTE: stopped here, need to update further****
-
-***NOTE: stopped here, need to update further****
+### Step 14: data cache, bcm access
 
 At this point, I ran out of low-hanging fruit ideas for how to bum cycles,
 so it's time to change the rules.  Our first hack will be to use virtual
@@ -1337,51 +1302,190 @@ virtual memory gives us (at least) two ways to speed up our code:
      get buffered in the fixed size write buffer which later retires
      them to memory, without requiring the store wait.
 
-For this I used pinned memory to do an identity map pin of the code.
-First, I ran with the default to double check the timings and to make
-sure the identity map worked.
+#### How to implement 
+
+The best way to do this is to adapt your pinned virtual memory
+identity mapping from 140e.  But if you want something quick and
+dirty, I included a patch `code/vm-enable.h` that defines two routines
+`vm_on_cache()` `vm_on_cache_off()`  to make it easy to play around
+with turning virtual memory on with different cache attributes.  
+
+To use the library:
+ 1. You'll need to include the header `vm-enable.h` in your `gpio-int.c` 
+    code.
+ 2. Modify `gpio-int.c` to call `vm_on_cache()` before running the test.
+ 3. Add the following to your Makefile before the `include` directive
+    at the bottom so it gets the VM library:
+
+        # put above the line "include $(CS340LX_2025_PATH)/..."
+        LIBVM   := $(CS340LX_2025_PATH)/lib/libvm-ident0.0/
+        INC     += -I$(LIBVM) -I$(LIBVM)/includes
+        LIBS    += $(LIBVM)/libvm-ident.a
+ 4. Experiment with different memory attributes.
+
+If you look at the code for `vm_on_cache()`, it includes a subset of the
+different page table entry memory attribute bits defined on chapter 6,
+page 6-15 of the arm 1176 manual:
+
+<p align="center">
+  <img src="images/page-table-attr-ch6-p6-15.png" width="600" />
+</p>
+
+When I wrote mine, I used pinned memory from 140e to do an identity
+map pin of the code.  I then ran with the default to double check the
+timings and to make sure the identity map worked.
 
 Then I did the following:
   1. Set the write-back functionality in the cp 15 control register 1
      (the 4th bit, see chapter 3, page 3-45, in the arm1176 manual).
 
-  2. Set the memory attribute for the BCM mapping (see `mem-attr.h`) to:
+  2. Set the memory attribute for the BCM mapping (see 140e's `mem-attr.h`
+     or this lab's `vm-enable.c`) to:
 
             // 6-15
             MEM_share_dev   = TEX_C_B(    0b000,  0, 1),
 
-  3. Set the data segments to write-back allocate (I didn't
-     see a difference for write-back no allocate):
+  3. Set the data, code, heap and stack segments to write-back allocate
+     (I didn't see a difference for write-back no allocate):
 
             // 6-15
             MEM_wb_alloc   =  TEX_C_B(    0b001,  1, 1),
 
-I got it down to about 140:
+
+After the first couple invocations, it got down to 99 cycles:
 
 ```
-0: rising = 141 cycles
-1: falling = 142 cycles
-2: rising = 141 cycles
-3: falling = 142 cycles
-4: rising = 141 cycles
-5: falling = 142 cycles
-6: rising = 141 cycles
-7: falling = 142 cycles
-8: rising = 141 cycles
-9: falling = 142 cycles
-10: rising = 141 cycles
-11: falling = 142 cycles
-12: rising = 141 cycles
-13: falling = 142 cycles
-14: rising = 141 cycles
-15: falling = 142 cycles
-16: rising = 141 cycles
-17: falling = 142 cycles
-18: rising = 141 cycles
-19: falling = 142 cycles
+vm on, caches on
+FIQ defined
+0: rising	= 99 cycles
+1: falling	= 99 cycles
+2: rising	= 99 cycles
+3: falling	= 99 cycles
+4: rising	= 99 cycles
+5: falling	= 99 cycles
+6: rising	= 99 cycles
+7: falling	= 99 cycles
+8: rising	= 99 cycles
+9: falling	= 99 cycles
+10: rising	= 99 cycles
+11: falling	= 99 cycles
+12: rising	= 99 cycles
+13: falling	= 99 cycles
+14: rising	= 99 cycles
+15: falling	= 99 cycles
+16: rising	= 99 cycles
+17: falling	= 99 cycles
+18: rising	= 99 cycles
+19: falling	= 99 cycles
 ```
 
+----------------------------------------------------------------------
+### Step 15: instruction prefetching
 
-***NOTE: at this point I'm still adding stuff.  The rest of the lab
-just has high bits.  Will add more writing.  Tuesday's lab will
-just be continuing the quest.***
+An obvious way to speed up code is cutting out instructions.  A less
+obvious method is to reduce interference between the code.  In our code:
+  1. We are running the timing loop over and over, which should bring it 
+     in the instruction cache.
+  2. However: we are also printing times on each measurement iteration.  
+     Our print code is fairly large, and there is a good chance it knocks
+     out at least part of the measurement code.  
+  3. In general such interference can happen anytime a routine A calls 
+     routine B and they are far enough way that they map to the same lines
+     in the icache, causing each to knock the other out.
+
+The general approach:
+  1. Remove `printk` interference: We rewrite the measurement code to store
+     all the measured times in a small array, and only print out the results 
+     when we are done measuring.
+  2. Reduce interference between the assembly measurement code, the interrupt
+     handler and the measurement driver (`test_cost`) by rearranging the 
+     binary so they are all next to each other in the machine code.  
+
+     To figure out how to do this, look at the (long) link command used:
+
+            arm-none-eabi-ld /home/engler/class/cs340lx-25aut//libpi/staff-start.o objs/gpio-int.o  ./objs/interrupt-asm.o      -T /home/engler/class/cs340lx-25aut//libpi/memmap -o objs/gpio-int.elf /home/engler/class/cs340lx-25aut//lib/libvm-ident0.0//libvm-ident.a /home/engler/class/cs340lx-25aut//libpi/libpi.a 
+
+
+    The linker will link all these files in order.  You can see that the code
+    for `gpio-int.o` will be placed before `interrupt-asm.o`.  So to pack 
+    the code densely, we place `test_cost` at the end of the `gpio-int.c` file,
+    the interrupt handler and the assembly measurement routine (`measure_int_asm`)
+    at the start of `interrupt-asm.S`. 
+
+    You should then look at your `.list` file to see that they are right
+    next to each other.  I had to tell `gcc` to not reorder routines by 
+    adding the flag to the makefile:
+
+            CFLAGS +=  -fno-toplevel-reorder
+
+
+These changes got me down to about 98 cycles at steady state:
+```
+0: rising = 163 cycles
+1: falling = 99 cycles
+2: rising = 105 cycles
+3: falling = 98 cycles
+4: rising = 98 cycles
+5: falling = 98 cycles
+6: rising = 98 cycles
+7: falling = 98 cycles
+8: rising = 98 cycles
+9: falling = 98 cycles
+10: rising = 98 cycles
+11: falling = 98 cycles
+12: rising = 98 cycles
+13: falling = 98 cycles
+14: rising = 98 cycles
+15: falling = 98 cycles
+16: rising = 98 cycles
+17: falling = 98 cycles
+18: rising = 98 cycles
+19: falling = 98 cycles
+ave cost = 101.650001
+```
+
+We'd like to get rid of the initial slower measurements.  To do so I
+use the prefetch instruction defined in chapter 3, page 3-76 of the
+arm1176 manual:
+
+<img src="images/ch3-instruction-prefetch-p3-76.png" width="400" />
+
+There's a definition in `cache-support.h`.  I placed a label `prefetch_end`
+at the end of the assembly code and could then just do:
+
+```
+    extern uint32_t prefetch_end[];
+    prefetch_inst((void*)test_cost2, prefetch_end);
+```
+
+This changed got us down to a flat 98 except for the very first 99 cycle run:
+
+```
+0: rising = 99 cycles
+1: falling = 98 cycles
+2: rising = 98 cycles
+3: falling = 98 cycles
+4: rising = 98 cycles
+5: falling = 98 cycles
+6: rising = 98 cycles
+7: falling = 98 cycles
+8: rising = 98 cycles
+9: falling = 98 cycles
+10: rising = 98 cycles
+11: falling = 98 cycles
+12: rising = 98 cycles
+13: falling = 98 cycles
+14: rising = 98 cycles
+15: falling = 98 cycles
+16: rising = 98 cycles
+17: falling = 98 cycles
+18: rising = 98 cycles
+19: falling = 98 cycles
+ave cost = 98.050003
+```
+
+----------------------------------------------------------------------
+### Now what?
+
+At this point I'm out of ideas other than overclocking the pi.  If you're in
+340lx and can get consistent better times I'll give you $100 :).
