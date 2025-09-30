@@ -1241,6 +1241,8 @@ detection you can see that synchronous waits for two BCM clock cycles.
 
 <p align="center">
 <img src="images/sync-gpio.png" width="400" />
+</p>
+<p align="center">
 <img src="images/async-gpio.png" width="400" />
 </p>
 
