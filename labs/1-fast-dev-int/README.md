@@ -793,6 +793,8 @@ After doing so I got almost a 40% improvement!
 19: falling	= 347 cycles
 ave cost = 342.950012
 ```
+
+
 ----------------------------------------------------------------------
 ### Step 8: cleanup
 
@@ -976,11 +978,26 @@ to about 2.6 *million* interrupts per second!  (700M cycles per sec /
 19: falling	= 272 cycles
 ave cost = 267.800018
 ```
-----------------------------------------------------------------------
-### Step 10: Icache.
 
-This is easy.  We turn on the icache and write the code to measure
-both with and without.
+#### Interesting weird
+
+In the FIQ interrupt handler we:
+  1. Write to the clear event GPIO address to clear the interrupt.
+  2. Set the global register to indicate the interrupt occured.
+
+We can do these in either order.  My measurements above did them (1)
+and then (2).  Weirdly, if I swap the order, then the times jump up
+to an average of 405 cycles!  I'm not sure why.  This makes me a bit
+uneasy, but so maybe someone can figure it out for extension credit.
+(My big concern is that there is a weird interaction between the global
+registers and cycle counter.)
+
+----------------------------------------------------------------------
+### Step 10: enable icache and branch prediction
+
+This is easy.  We turn on the icache and branch prediction and add a
+couple lines to measure both with and without.  If you're lazy you can
+just call the libpi routine `caches_enable()`.
 
 This makes almost a 40% difference!   Great!
 ```
@@ -1010,31 +1027,285 @@ ave cost = 167.750000
 
 As usual we have a large cost for the first value. We can eliminate
 this by either doing a warmup or a doing a prefetch into the icache
-(see chapter 3 of the arm1176 manual).  You can see this by running the
-code again:
+(see chapter 3 of the arm1176 manual).  You can see this by invoking the
+measurement code twice after enabling the cache.
+
+#### Interesting weird
+
+One interesting thing: if you turn off the branch target cache, the
+variance appears flattens significantly after the first couple of runs.
+The branch cache is small and our code is weird, so it makes some sense
+that it not give a consistent improvement.
+
+To disable the branch target cache: 
+  - Clear bit 11 (the branch predicate bit) in the cp15 coprocessor's register 1.
+  - See: chapter 3, page 3-46 of the arm1176 manual.
 
 ```
-0: rising	= 158 cycles
-1: falling	= 158 cycles
-2: rising	= 167 cycles
-3: falling	= 167 cycles
-4: rising	= 167 cycles
-5: falling	= 158 cycles
-6: rising	= 167 cycles
-7: falling	= 167 cycles
-8: rising	= 167 cycles
-9: falling	= 167 cycles
-10: rising	= 167 cycles
-11: falling	= 158 cycles
-12: rising	= 167 cycles
-13: falling	= 158 cycles
-14: rising	= 167 cycles
-15: falling	= 158 cycles
-16: rising	= 158 cycles
-17: falling	= 167 cycles
-18: rising	= 167 cycles
-19: falling	= 158 cycles
-ave cost = 163.400009
+0: rising	= 239 cycles
+1: falling	= 181 cycles
+2: rising	= 161 cycles
+3: falling	= 161 cycles
+4: rising	= 161 cycles
+5: falling	= 161 cycles
+6: rising	= 161 cycles
+7: falling	= 161 cycles
+8: rising	= 161 cycles
+9: falling	= 161 cycles
+10: rising	= 161 cycles
+11: falling	= 161 cycles
+12: rising	= 161 cycles
+13: falling	= 161 cycles
+14: rising	= 161 cycles
+15: falling	= 161 cycles
+16: rising	= 161 cycles
+17: falling	= 161 cycles
+18: rising	= 161 cycles
+19: falling	= 161 cycles
+```
+
+----------------------------------------------------------------------
+### Step 11: remove branching by using a continuation
+
+Now we start getting a little weird by using a form of continuation to
+eliminate measurement overhead, which currently inflates our times.
+
+For this hack, you need to think about what the measurement code is doing 
+at a low level.
+
+Currently the measurement code waits for the interrupt handler to run by
+spins in a loop waiting for the handler to set a global register
+Once the register is set, the loop branches and measures the cycle count.
+
+My C code looks like:
+```
+        asm volatile(".align 5");
+        c = cycle_cnt_read();
+        gpio_set_on_raw(pin);
+        // 1. wait until interrupt sets global reg
+        while(!global_reg_set())   
+            ;
+        // 2. measure the cycle
+        e = cycle_cnt_read();
+```
+
+If you look at the measurement code's assembly, it should look something
+like the following (note your code addresses will be different!);
+```
+    8168:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
+    816c:   e3530000    cmp r3, #0
+    8170:   0afffffc    beq 8168 <test_cost+0x108>
+    8174:   ee1f4f3c    mrc 15, 0, r4, cr15, cr12, {1}
+```
+
+The four steps:
+  - 8168: Reads the global register into r3.
+  - 816c: Compares the value in r3 against 0.
+  - 8170: If r3 is (still) zero continue the loop by branching to 8168.
+          Otherwise fall-through (exit the loop) to 8174.
+  - 8174: Exit: read the cycle counter.
+
+The cost of the read (8168), check (816c), and branch instruction (8170)
+will always be added to the cost of the interrupt even though they just
+pure measurement overhead.
+
+If you think about it, in some sense these instructions are redundant.
+We can compute the same result --- that the interrupt handler has (1)
+been invoked and (2) has completed --- by having the interrupt handler
+branch to instruction 8174 when it returns!    
+
+This guarantees the same ordering --- that we read the cycle counter only
+after the interrupt handler completes --- but without the extra steps.
+
+
+There's various ways to make this change.  However, you probably need to 
+write the measurement code in assembly so that:
+  1. You have complete control of the label in the measurement code
+     that the interrupt handler will jump to.
+  2. The compiler does not break the code.  What we are doing is wildly
+     undefined as far as the C standard is concerned.  Writing in assembly
+     guarantees the C compiler won't see the code, and so can't break it.
+     For example, by reordering operations it should not, or relying on
+     registers it cannot.  (If you recall we wrote our 140e low level
+     virtual memory code in assembly for similar reasons.)
+
+I rewrote the measurement code to call a helper function 
+(`measure_int_asm`) in assembly.
+To minimize the assembly code, I passed in the GPIO address to 
+write to, and the constant to write:
+```
+        t = measure_int_asm(gpio_set0, 1<<pin);
+        output("%d: rising\t= %d cycles\n", i*2, t);
+        sum += t;
+```
+
+My assembly code looks sort-of like:
+```
+    r3 = resume_label
+    r2 = read cycle counter
+    @ infinite loop
+    inf: 
+        b inf
+resume_label:
+    r0 = read cycle counter
+    sub r0, r0, r2
+    bx lr
+```
+
+Note:
+  - To avoid the need to push and pop registers, I used caller-saved registers
+    (r0-r3, r12).
+
+I then rewrote the interrupt handler:
+  1. delete the instructions to set the global regiser (yea!).
+  2. Jump to the label in register r3.
+
+With the icache on this got me down to:
+
+```
+0: rising	= 156 cycles
+1: falling	= 113 cycles
+2: rising	= 113 cycles
+3: falling	= 111 cycles
+4: rising	= 113 cycles
+5: falling	= 113 cycles
+6: rising	= 113 cycles
+7: falling	= 111 cycles
+8: rising	= 113 cycles
+9: falling	= 111 cycles
+10: rising	= 113 cycles
+11: falling	= 113 cycles
+12: rising	= 113 cycles
+13: falling	= 113 cycles
+14: rising	= 113 cycles
+15: falling	= 113 cycles
+16: rising	= 113 cycles
+17: falling	= 113 cycles
+18: rising	= 113 cycles
+19: falling	= 113 cycles
+ave cost = 114.849998
+```
+
+#### interesting weird.
+
+Repeating the weirdness we noticed earlier with global registers, this
+change made the non-cached version almost 33% slower with an average
+of 364.  This is weird: if you can figure this out, let me know.
+I'm ignoring it at the moment since we are going to use the cache.
+But this is not great form.
+
+----------------------------------------------------------------------
+### Step 12: async GPIO
+
+It's now getting hard to shave cycles and and each return is somewhat
+meager.  But we keep at it.
+
+If you notice we are using sync GPIO events, we can switch to async
+for a couple cycles.
+
+From the GPIO chapter in the BCM2835 document (starting page 90) if
+you read the description about the synchronous and asynchronous edge
+detection you can see that synchronous waits for two BCM clock cycles.
+
+<img src="images/sync-gpio.png" width="400" />
+<img src="images/async-gpio.png" width="400" />
+
+Since the BCM clock is 250Mhz and the ARM is 700Mhz, this will add a
+bit of time.  So we switch to asynchronous FIQ interrupts.  I wrote
+two new GPIO routines to do so:
+
+    gpio_fiq_async_rising_edge(in_pin);
+    gpio_fiq_async_falling_edge(in_pin);
+
+
+This dropped me down two cycles.
+```
+0: rising	= 150 cycles
+1: falling	= 109 cycles
+2: rising	= 109 cycles
+3: falling	= 109 cycles
+4: rising	= 109 cycles
+5: falling	= 109 cycles
+6: rising	= 109 cycles
+7: falling	= 109 cycles
+8: rising	= 109 cycles
+9: falling	= 109 cycles
+10: rising	= 109 cycles
+11: falling	= 109 cycles
+12: rising	= 109 cycles
+13: falling	= 109 cycles
+14: rising	= 109 cycles
+15: falling	= 109 cycles
+16: rising	= 109 cycles
+17: falling	= 109 cycles
+18: rising	= 109 cycles
+19: falling	= 109 cycles
+ave cost = 111.050003
+```
+
+----------------------------------------------------------------------
+### Step 13: wait for interrupt
+
+(Other than using virtual memory, which we do next.)
+
+(Somewhat lower-rent than the old physicist method of the three Bs for
+insight --- "bed, bath, bus.")
+
+At this point I was stuck for a couple days on how to cut any more
+cycles.  And then while in the shower remembered reading about a "wait
+for interrupt" instruction in chapter 3 of the arm1176 manual (see page
+3-85).  At the time it seemed to be about low power, so I'd ignored it.
+But desperate times.
+
+
+Dropping it in, there was a major difference!
+With the cache on it got around 98 cycles!
+
+```
+icache on
+0: rising = 268 cycles
+1: falling = 99 cycles
+2: rising = 108 cycles
+3: falling = 98 cycles
+4: rising = 98 cycles
+5: falling = 98 cycles
+6: rising = 98 cycles
+7: falling = 98 cycles
+8: rising = 98 cycles
+9: falling = 98 cycles
+10: rising = 98 cycles
+11: falling = 98 cycles
+12: rising = 98 cycles
+13: falling = 98 cycles
+14: rising = 98 cycles
+15: falling = 98 cycles
+16: rising = 98 cycles
+17: falling = 98 cycles
+18: rising = 98 cycles
+19: falling = 98 cycles
+
+
+icache off
+0: rising = 104 cycles
+1: falling = 104 cycles
+2: rising = 104 cycles
+3: falling = 104 cycles
+4: rising = 104 cycles
+5: falling = 104 cycles
+6: rising = 104 cycles
+7: falling = 104 cycles
+8: rising = 104 cycles
+9: falling = 104 cycles
+10: rising = 104 cycles
+11: falling = 104 cycles
+12: rising = 104 cycles
+13: falling = 104 cycles
+14: rising = 104 cycles
+15: falling = 104 cycles
+16: rising = 104 cycles
+17: falling = 104 cycles
+18: rising = 104 cycles
+19: falling = 104 cycles
 ```
 
 ----------------------------------------------------------------------
@@ -1110,128 +1381,6 @@ I got it down to about 140:
 19: falling = 142 cycles
 ```
 
-----------------------------------------------------------------------
-### Step 9: goto
-
-Currently the test code spins in a loop waiting for the interrupt handler
-to set a global register.  The cost of this read, check, and branch 
-will always be added to the cost of the interrupt.  We can get rid of
-it with slighly a weird trick.  Rewrite the code to *not* check for 
-an interrupt, but instead write a continuation address to a location
-that the interrupt handler can jump to when it returns.  
-This means the code does not have to check anything but will run
-immediately.
-
-
-So instead of:
-```
-        let f = n_int_get();
-        c = cycle_cnt_read();
-        gpio_set_off_raw(pin);
-        while(!n_int_get())
-            ;
-        e = cycle_cnt_read();
-```
-
-We do something like this pseudo-code: 
-```
-        c = cycle_cnt_read();
-        gpio_set_off_raw(pin);
-        while(1)
-            ;
-        resume_label:
-            e = cycle_cnt_read();
-```
-And have the interrupt handler jump to the resume label always.
-
-
-This got me down to:
-
-
-```
-0: rising = 159 cycles
-1: falling = 114 cycles
-2: rising = 132 cycles
-3: falling = 112 cycles
-4: rising = 113 cycles
-5: falling = 112 cycles
-6: rising = 113 cycles
-7: falling = 112 cycles
-8: rising = 113 cycles
-9: falling = 112 cycles
-10: rising = 113 cycles
-11: falling = 112 cycles
-12: rising = 113 cycles
-13: falling = 112 cycles
-14: rising = 113 cycles
-15: falling = 112 cycles
-16: rising = 113 cycles
-17: falling = 112 cycles
-18: rising = 113 cycles
-19: falling = 112 cycles
-```
-
-----------------------------------------------------------------------
-### Step 10: async GPIO
-
-If you notice we are using sync GPIO events, we can switch to async
-for a couple cycles.
-
-----------------------------------------------------------------------
-### Step 11: wait for interrupt
-
-If you search in chapter 3 you see there is a "wait for interrupt"
-instruction.  Use it!
-
-
-With the cache on it got around 98 cycles!
-
-```
-icache on
-0: rising = 268 cycles
-1: falling = 99 cycles
-2: rising = 108 cycles
-3: falling = 98 cycles
-4: rising = 98 cycles
-5: falling = 98 cycles
-6: rising = 98 cycles
-7: falling = 98 cycles
-8: rising = 98 cycles
-9: falling = 98 cycles
-10: rising = 98 cycles
-11: falling = 98 cycles
-12: rising = 98 cycles
-13: falling = 98 cycles
-14: rising = 98 cycles
-15: falling = 98 cycles
-16: rising = 98 cycles
-17: falling = 98 cycles
-18: rising = 98 cycles
-19: falling = 98 cycles
-
-
-icache off
-0: rising = 104 cycles
-1: falling = 104 cycles
-2: rising = 104 cycles
-3: falling = 104 cycles
-4: rising = 104 cycles
-5: falling = 104 cycles
-6: rising = 104 cycles
-7: falling = 104 cycles
-8: rising = 104 cycles
-9: falling = 104 cycles
-10: rising = 104 cycles
-11: falling = 104 cycles
-12: rising = 104 cycles
-13: falling = 104 cycles
-14: rising = 104 cycles
-15: falling = 104 cycles
-16: rising = 104 cycles
-17: falling = 104 cycles
-18: rising = 104 cycles
-19: falling = 104 cycles
-```
 
 ***NOTE: at this point I'm still adding stuff.  The rest of the lab
 just has high bits.  Will add more writing.  Tuesday's lab will
