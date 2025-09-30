@@ -1444,22 +1444,23 @@ The general approach:
      handler and the measurement driver (`test_cost`) by rearranging the 
      binary so they are all next to each other in the machine code.  
 
-     To figure out how to do this, look at the (long) link command used:
 
+
+To figure out how to do this, look at the (long) link command used:
 ```
             arm-none-eabi-ld /home/engler/class/cs340lx-25aut//libpi/staff-start.o objs/gpio-int.o  ./objs/interrupt-asm.o      -T /home/engler/class/cs340lx-25aut//libpi/memmap -o objs/gpio-int.elf /home/engler/class/cs340lx-25aut//lib/libvm-ident0.0//libvm-ident.a /home/engler/class/cs340lx-25aut//libpi/libpi.a 
 ```
 
 
-    The linker will link all these files in order.  You can see that the code
-    for `gpio-int.o` will be placed before `interrupt-asm.o`.  So to pack
-    the code densely, we place `test_cost` at the end of the `gpio-int.c`
-    file and place the interrupt handler and the assembly measurement
-    routine (`measure_int_asm`) at the start of `interrupt-asm.S`.
+The linker will link all these files in order.  You can see that the code
+for `gpio-int.o` will be placed before `interrupt-asm.o`.  So to pack
+the code densely, we place `test_cost` at the end of the `gpio-int.c`
+file and place the interrupt handler and the assembly measurement
+routine (`measure_int_asm`) at the start of `interrupt-asm.S`.
 
-    You should then look at your `.list` file to see that these three
-    pieces are right next to each other.  I had to tell `gcc` to not
-    reorder routines by adding the flag to the makefile:
+You should then look at your `.list` file to see that these three
+pieces are right next to each other.  I had to tell `gcc` to not
+reorder routines by adding the flag to the makefile:
 
             CFLAGS +=  -fno-toplevel-reorder
 
