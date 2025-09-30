@@ -1,34 +1,9 @@
-## Making a fast interrupt-based digital analyzer.
+## Making device interrupts fast
 
 This is a fun lab: you'll make GPIO interrupts as fast as possible.
 The lab goes from about 3300 cycles down to 98 --- roughly a 33x speedup.
 If you beat the final staff numbers by a non-noise amount I'll give you
 $100 :).
-
-Two favorite things about the lab: 
-  1. Optimizing tends to produce fun flow states.  When tuning my version
-     I was staying up til 3am and waking up thinking about hacks to cut
-     cycles for days in a row.  When you get up to my age you'll realize
-     how rare such days are :).
-
-  2. The starter code is small + and you've seen it before so there's
-     not alot to worry about besides your own ideas and hardware features
-     / implications.
-
-#### Starter code: `code/gpio-int.c` and `code/interrupt-asm.S`
-
-The starter code measures how long it takes to handle a GPIO generated
-interrupt.  There are two files:
-  - `code/gpio-int.c`: C code that sets up interrupts on rising and falling
-    edges of a single GPIO pin, and then uses a simple loop to trigger
-    them by alternatively writing 1 and 0 and measure the overhead.
-
-  - `code/interrupts-asm.S`: assembly code to define the interrupt/exception 
-    table and forward interrupts to C code.
-
-The code is simple but slow.  Your job is to speed it up as much
-as possible.  The code is roughly the same as examples you've seen in
-140e's device interrupt lab (lab 8) and 240lx's IR lab (lab 3).
 
 Why do we want fast interrupts?
   1. The more we can do per second.  Throughput is money!
@@ -48,6 +23,33 @@ Why do we want fast interrupts?
      something else).  The less tosses, the less variance (accuracy).
      You don't have to believe me: you'll see variance drop as you tune
      the code.
+
+Two favorite things about the lab: 
+  1. Optimizing tends to produce fun flow states.  When tuning my version
+     I was staying up til 3am and waking up thinking about hacks to cut
+     cycles for days in a row.  When you get up to my age you'll realize
+     how rare such days are :).
+
+  2. The starter code is small + and you've seen it before so there's
+     not alot to worry about besides your own ideas and hardware features
+     / implications.
+
+
+#### Starter code: `code/gpio-int.c` and `code/interrupt-asm.S`
+
+The starter code measures how long it takes to handle a GPIO generated
+interrupt.  There are two files:
+  - `code/gpio-int.c`: C code that sets up interrupts on rising and falling
+    edges of a single GPIO pin, and then uses a simple loop to trigger
+    them by alternatively writing 1 and 0 and measure the overhead.
+
+  - `code/interrupts-asm.S`: assembly code to define the interrupt/exception 
+    table and forward interrupts to C code.
+
+The code is simple but slow.  Your job is to speed it up as much
+as possible.  The code is roughly the same as examples you've seen in
+140e's device interrupt lab (lab 8) and 240lx's IR lab (lab 3).
+
 
 #### Checkoff
 
@@ -819,11 +821,13 @@ ave cost = 342.950012
 ----------------------------------------------------------------------
 ### Step 8: cleanup
 
-Now that the code is inlined we can make two other changes.
+Now that the code is inlined we can make two other changes to the interrupt
+handling code.
 
-First, we modify the exception pc by doing a subtract as the first
-instruction.  We later do a `movs` of this into the pc to return.
-We can combine these and just do a single `subs`.
+First, currently the interrupt handler modifies the exception pc by doing
+a subtract as the first instruction.  It later do a `movs` of this result
+into the pc to return from the interrupt.  We can combine these and just
+do a single `subs`.
 
 Our second sleazy change is to get rid of the initial jump to the
 interrupt trampoline.  Since we do not have any other exceptions or
