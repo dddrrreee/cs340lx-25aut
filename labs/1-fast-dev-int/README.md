@@ -1490,11 +1490,13 @@ These changes got me down to about 98 cycles at steady state:
 ave cost = 101.650001
 ```
 
-We'd like to get rid of the initial slower measurements.  To do so I
+We'd like to get rid of the first few initial slow measurements.  To do so I
 use the prefetch instruction defined in chapter 3, page 3-76 of the
 arm1176 manual:
 
-<img src="images/ch3-instruction-prefetch-p3-76.png" width="400" />
+<p align="center">
+<img src="images/ch3-instruction-prefetch-p3-76.png" width="600" />
+</p>
 
 There's a definition in `cache-support.h`.  I placed a label `prefetch_end`
 at the end of the assembly code and could then just do:
