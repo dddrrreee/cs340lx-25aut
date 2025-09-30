@@ -1,8 +1,9 @@
 ## Making a fast interrupt-based digital analyzer.
 
 This is a fun lab: you'll make GPIO interrupts as fast as possible.
+The lab goes from about 3300 cycles down to 98 --- roughly a 33x speedup.
 If you beat the final staff numbers by a non-noise amount I'll give you
-$100 :).  
+$100 :).
 
 Two favorite things about the lab: 
   1. Optimizing tends to produce fun flow states.  When tuning my version
@@ -137,6 +138,10 @@ Some absolute rules:
   4. Keep it simple.  Simple code is much easier to make fast
      versus complex.  (Just like anything else!)
 
+  5. If you can do A and B in either order, try both and measure.
+     Sometimes you will discover very weird timing differences (there
+     are a few noted in the lab below!).  These differences can point
+     out possible optimizations, as well as mistakes.
 
 ----------------------------------------------------------------------
 ### Step 0: our starting point.
