@@ -1064,10 +1064,10 @@ into the icache.
 
 #### Interesting weird timing
 
-One interesting thing: if you turn off the branch target cache, the
-variance appears flattens significantly after the first couple of runs.
-The branch cache is small and our code is weird, so it makes some sense
-that it not give a consistent improvement.
+One interesting thing: if you turn off branch prediction, the variance
+appears flattens significantly after the first couple of runs.  The branch
+cache is small and our code is weird, so it makes some sense that it
+not give a consistent improvement.
 
 To disable the branch target cache: 
   - Clear bit 11 (the branch predicate bit) in the cp15 coprocessor's register 1.
@@ -1162,10 +1162,9 @@ write the measurement code in assembly so that:
      registers it cannot.  (If you recall we wrote our 140e low level
      virtual memory code in assembly for similar reasons.)
 
-I rewrote the measurement code to call a helper function 
-(`measure_int_asm`) in assembly.
-To minimize the assembly code, I passed in the GPIO address to 
-write to, and the constant to write:
+I rewrote the measurement code to call a helper function
+(`measure_int_asm`) in assembly.  To minimize the assembly code, I passed
+in the GPIO address to write to, and the constant to write:
 ```
         t = measure_int_asm(gpio_set0, 1<<pin);
         output("%d: rising\t= %d cycles\n", i*2, t);
@@ -1240,8 +1239,10 @@ From the GPIO chapter in the BCM2835 document (starting page 90) if
 you read the description about the synchronous and asynchronous edge
 detection you can see that synchronous waits for two BCM clock cycles.
 
+<p align="center">
 <img src="images/sync-gpio.png" width="400" />
 <img src="images/async-gpio.png" width="400" />
+</p>
 
 Since the BCM clock is 250Mhz and the ARM is 700Mhz, this will add a
 bit of time.  So we switch to asynchronous FIQ interrupts.  I wrote
