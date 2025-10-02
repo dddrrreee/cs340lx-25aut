@@ -1556,7 +1556,8 @@ You can read about the mailbox interface at:
 ### Update: overclocking.
 
 UPDATE:  I worked on overclocking some the day after and got about a 40% speedup:
-from 98 cycles down to 59.7.  This gives about 11.7 million interrupts per second.
+from 98 cycles down to 59.7.  This gives about 11.7 million interrupts per second
+and is about a 54x improvement from baseline.  
 
 My config file was:
 ```
