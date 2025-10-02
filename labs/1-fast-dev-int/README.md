@@ -1551,3 +1551,83 @@ You can read about the mailbox interface at:
   - [Overclock flags and
   settings](https://www.raspberrypi.com/documentation/computers/config_txt.html#overclocking-options). This is from the rpi foundation --- you'll need
     to scroll down a bunch to get to the flags table.
+
+----------------------------------------------------------------------
+### Update: overclocking.
+
+UPDATE:  I worked on overclocking some the day after and got about a 40% speedup:
+from 98 cycles down to 59.7.  This gives about 11.7 million interrupts per second.
+
+My config file was:
+```
+########################################################################
+#  see:
+#     https://forums.raspberrypi.com/viewtopic.php?t=322718
+# for a nice aggregated set of writeups.
+
+arm_freq=1150
+# arm_freq=1085
+
+gpu_freq=600
+# gpu_freq=530
+
+core_freq=600
+# core_freq=515
+
+sdram_freq=600
+# sdram_freq=533
+
+# over_voltage=2
+over_voltage=6
+
+# over_voltage_sdram=1
+over_voltage_sdram=4
+
+########################################################################
+# original config stuff we have 
+
+# gpu_mem=64
+gpu_mem=16
+
+kernel=kernel.img
+kernel_address=0x8000
+
+# on the pi zero w you need this line or it won't work.
+# zhouheng sun found this!
+enable_uart=1 
+
+start_file=start_cd.elf
+fixup_file=fixup_cd.dat
+```
+
+Since we can't directly compare overclocked CPU cycles to our original
+CPU cycles, I scaled them as follows.  First,  changed `test_cost` to
+return the average number of cycles per interrupt.   Second, converted
+the overclock cycles back to the old 700MHz ARM frequency as follows:
+
+```
+    // use the mailbox interface to get the current CPU MHz.
+    uint32_t cur_MHz = cpu_MHz_get();
+    
+    ...
+    float cycles_per_int = test_cost(out_pin);
+
+    // scale back down to the original 700MHz
+    uint32_t orig_MHz = 700*1000*1000;
+    float scaled_cycles = (cycles_per_int * orig_MHz) / cur_MHz;
+
+    // number of interrupts per second with overclocking.
+    float int_per_sec = cur_MHz / cycles_per_int;
+    output("interrupts per second = %fM, scaled cycles per int=%f\n",
+        int_per_sec/(1000.*1000.), scaled_cycles);
+```
+
+
+Correctness notes:
+ - Each board has different limits.  It's possible yours does not go as far
+   as mine did.  It's probably best to start lower and work up.
+
+ - If you try to use the mailbox interface with cached memory, it won't work
+   because of coherence.  The easiest way is to just do the mailbox operations
+   before turning on virtual memory.  You could also mark a region as uncached
+   and use that.
