@@ -1,11 +1,9 @@
 # PCB (KiCAD) Lab v2 by Parthiv
 
 ## Overview
-This lab will be focused on designing printed circuit boards (PCBs), which many students in 140e/240lx/340lx have found useful over the years in final projects to help reduce wiring complexity and increase hardware reliability. The focus of the lab will be on how to replace a bundle of wires with an inexpensive PCB, and not on how to actually design electrical circuits (which is a much more complicated discussion). 
+This lab will be focused on designing printed circuit boards (PCBs), which many students in 140e/240lx/340lx have found useful over the years in final projects to help reduce wiring complexity and increase hardware reliability. The focus of the lab will be on how to replace a bundle of wires with an inexpensive PCB, and not on how to actually design electrical circuits (which is a much more complicated discussion). For the most part, you can get by just connecting breakout boards together. If you want to integrate a piece of hardware without a breakout board, most datasheets will include an "application circuit" that will show you what supporting hardware is needed.
 
 Our goal is to create a board that can plug into the Raspberry Pi GPIO header and connect to a USB to UART converter along with some RGB LEDs. To extend the lab, you'll also add in connections to a few sensors/peripherals/hardware of your choice. 
-
-There will be a few parts of the lab where you can take a simpler approach or a more complex approach. I'd suggest first designing with the simpler approach; you can always come back and do a revision once you've got the hang of things.
 
 ## General Keyboard Shortcuts
 I assume `Ctrl` becomes `Cmd` on mac.
@@ -157,11 +155,6 @@ Please review [PRELAB.md](./PRELAB.md). If interested, you can also check out a 
 
     Then click "Apply, Save Schematic & Continue". You can then close out of the Assign Footprints window and the schematic editor.
 
-### Advanced
-
-1. Rather than using a CP2102 breakout board, look up a datasheet and place your own CP2102 chip and all of the various supporting components so you can plug a USB cable into your PCB and talk UART with your Pi. You can also check out the included `parthiv_pcb_v2.1` project which will contain a sub-schematic for the CP2102N and supporting hardware. You can copy this schematic into your project and import it, though it's a good exercise to build it from a datasheet. 
-
-2. You can also do the same with the raw part from the breakout board, which will be much cheaper than doing it with the breakout. However, I would always suggest having the breakout board as a backup option to help you determine if bugs are software-related or hardware-related.
 
 ### Schematic Editor Keyboard Shortcuts
 
@@ -377,3 +370,16 @@ You have silkscreen that is either drawn off the edge of the board, or overlaps 
 ## Step 3: Manufacture the PCB
 
 Coming soon. If you get to this point and it's not ready, refer to a previous lab. I just need to dry run and make sure that everything is still the same. 
+
+## Step 4: Extensions
+
+Here are some ideas for extensions.
+
+1. Rather than using a CP2102 breakout board, look up a datasheet and place your own CP2102 chip and all of the various supporting components so you can plug a USB cable into your PCB and talk UART with your Pi. You can also check out the included `parthiv_pcb_v2.1` project which will contain a sub-schematic for the CP2102N and supporting hardware. You can copy this schematic into your project and import it, though it's a good exercise to build it from a datasheet. 
+
+2. You can also do the same with any raw part that you selected, which will often be much cheaper than doing it with the breakout for volume production. However, I would always suggest having the breakout board as a backup option to help you determine if bugs are software-related or hardware-related. Check out JLCPCB parts to see what's available for manufacturing.
+
+3. Create some interesting artwork and integrate it into the board shape, silkscreen, and/or component layout of your board.
+
+4. Use the [KiCAD python API](https://gitlab.com/kicad/code/kicad-python) to programatically define aspects of your layout. For example, you can place a bunch of LEDs into a grid.
+
