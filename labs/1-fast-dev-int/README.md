@@ -1607,7 +1607,7 @@ One reason I like this lab is that it ties together so many different
 arm1176 features.  The more you know, the more you can weaponize against
 slow code.
 
-James and Sai took this approach to heart and over the weekend went
+James and Sai (340lx '25) took this approach to heart and over the weekend went
 through every chapter in the arm1176 manual looking for different tricks
 to play.
 
