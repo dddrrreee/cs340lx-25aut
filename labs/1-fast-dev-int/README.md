@@ -14,13 +14,13 @@ Why do we want fast interrupts?
      difference between correct and broken.
 
      Examples of why accuracy good: running time-based digital protocols
-     fast and for measuring what is going on (e.g., building a logic
+     fast, measuring what is going on (e.g., building a logic
      analyzer: later lab!).
 
      Why fast = accuracy: the faster the interrupt handler is, the less
      stuff does.  In general, each thing it does is a coin toss that can
      take a varying amount of time (either directly or by conflicting with
-     something else).  The less tosses, the less variance (accuracy).
+     something else).  The more tosses, the more variance (error).
      You don't have to believe me: you'll see variance drop as you tune
      the code.
 
@@ -98,9 +98,12 @@ What I would do:
      After the lab I have:
 
             % ls
-            0-start     3-global-reg  6-vm	  
-            1-inline    4-set-cnt	  7-goto  
-            2-simplify  5-fiq	  8-wfi
+            0-start         1-simple        2-inline
+            3-cut-if        4-global-regs   5-housekeep
+            6-set           7-all-asm       8-cleanup
+            9-fiq           10-icache       11-continuation
+            12-async-gpio   13-wait-int     14-vm       
+            15-prefetch     16-low-latency-int 17-overclock
 
 I know this sounds incredibly boomer.  But it's simple-dumb in a way
 that just works.  It's a lifesaver to have a series of clearly described
@@ -1537,6 +1540,9 @@ ave cost = 98.050003
 
 At this point I'm out of ideas other than over-clocking the pi.  If you're
 in 340lx and can get consistent better times I'll give you $100 :).
+   - UPDATE: James Chen and Sai Konkimalla found a trick to shave off
+     4 cycles!  See next section.
+
 
 We've improved the cost from  about 3200 cycles down to 98, roughly
 a 33x improvement.  If we could maintain these times for back to back
@@ -1544,20 +1550,104 @@ interrupts, this would work out to potentially 7.1M interrupts per second:
   - The pi runs at 700Mhz.
   - (700M cycles / sec) / (98 cycles) = 7.1M.
 
-My hope is that over-clocking will let us double these numbers.  TBD!
-You can read about the mailbox interface at:
+
+My hope is that over-clocking will let us double these numbers.  TBD!  (UPDATE:
+it did, see below.) You can read about the mailbox interface at:
   - [mailboxes](https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
   - [240lx lab 1](https://github.com/dddrrreee/cs240lx-25spr/tree/main/labs/1-mailboxes)
   - [Overclock flags and
   settings](https://www.raspberrypi.com/documentation/computers/config_txt.html#overclocking-options). This is from the rpi foundation --- you'll need
     to scroll down a bunch to get to the flags table.
 
+
 ----------------------------------------------------------------------
-### Update: overclocking.
+### Step 16: James and Sai's $100 bounty hack: low-latency interrupts.
+
+One reason I like this lab is that it ties together so many different
+arm1176 features.  The more you know, the more you can weaponize against
+slow code.
+
+James and Sai took this approach to heart and over the weekend went
+through every chapter in the arm1176 manual looking for different tricks
+to play.
+
+They found one --- "low latency features for fast interrupts" --- in
+chapter 3 of the arm1176 manual, the same place we've found many other
+interesting tricks.
+
+   - Funny enough, the feature is literally annotated with words yelling
+     for us to use it but everyone has missed it completely in all the
+     years we've done these kind of hacks.
+
+     (In my defense: As James pointed out, it's not listed in the table
+     of contents.   Though I did have a comment on it in a header file
+     from years ago and yet didn't make the connection.)
+
+   - It's worth reading and re-reading chapter 3 and filing
+     away the different oddities --- by the birthday paradox and pigeon
+     hole principle some will be useful!
+
+
+The great thing about this hack is that you don't have to rewrite your
+existing code: just add a couple lines to set the F1 bit in co-processor
+15's control register 1.  See chapter 3 in the arm1176 manual, page 3-45:
+
+<p align="center">
+<img src="images/low-latency-interrupt-p3-45.png" width="600" />
+</p>
+
+You already have set and get methods for this register from 
+140e, but for completeness we include it (from page 3-47):
+
+<p align="center">
+<img src="images/asm-c1-control-reg-p3-47.png" width="600" />
+</p>
+
+
+Using the original 140e code, I just added the following after setting
+up the FIQ interrupts (ordering probably doesn't matter):
+```
+    // james' and sai's low latency overclock.
+    let c1 = staff_cp15_ctrl_reg1_rd();
+    c1.F1 = 1;
+    cp15_ctrl_reg1_wr(c1);
+```
+
+It cut about 4 cycles off my times:
+
+
+```
+0: rising = 95 cycles
+1: falling = 94 cycles
+2: rising = 94 cycles
+3: falling = 94 cycles
+4: rising = 94 cycles
+5: falling = 94 cycles
+6: rising = 94 cycles
+7: falling = 94 cycles
+8: rising = 94 cycles
+9: falling = 94 cycles
+10: rising = 94 cycles
+11: falling = 94 cycles
+12: rising = 94 cycles
+13: falling = 94 cycles
+14: rising = 94 cycles
+15: falling = 94 cycles
+16: rising = 94 cycles
+17: falling = 94 cycles
+18: rising = 94 cycles
+19: falling = 94 cycles
+ave cost = 94.050003
+```
+
+Given all the time I spent thinking about this problem, it's $100 well spent!
+
+----------------------------------------------------------------------
+### Update: Step 17: overclocking.
 
 UPDATE:  I worked on overclocking some the day after and got about a 40% speedup:
-from 98 cycles down to 59.7.  This gives about 11.7 million interrupts per second
-and is about a 54x improvement from baseline.  
+from 94 cycles down to 57.2.  This gives about 12.2 million interrupts per second
+and is about a 56x improvement from baseline.  
 
 My config file was:
 ```
@@ -1632,3 +1722,50 @@ Correctness notes:
    because of coherence.  The easiest way is to just do the mailbox operations
    before turning on virtual memory.  You could also mark a region as uncached
    and use that.
+
+There's still some tweaking that can be done, and probably some other
+overclock settings to mess with.   If you find any new overclocking
+tricks let me know!  The main idea I have left is rewrit
+
+My main idea for improving the code is to eliminate almost all measurement
+overhead by changing the code from measuring the cost of 1 interrupt to
+measuring the cost of many and dividing this time down.  This is a form
+of batching --- one of the most widely applicable optimization tricks ---
+so is actually a nice example to end on.
+
+The detailed results from the run:
+```
+0: rising = 95 cycles
+1: falling = 94 cycles
+2: rising = 94 cycles
+3: falling = 94 cycles
+4: rising = 94 cycles
+5: falling = 94 cycles
+6: rising = 94 cycles
+7: falling = 94 cycles
+8: rising = 94 cycles
+9: falling = 94 cycles
+10: rising = 94 cycles
+11: falling = 94 cycles
+12: rising = 94 cycles
+13: falling = 94 cycles
+14: rising = 94 cycles
+15: falling = 94 cycles
+16: rising = 94 cycles
+17: falling = 94 cycles
+18: rising = 94 cycles
+19: falling = 94 cycles
+ave cost = 94.050003
+interrupts per second = 12.227538M, scaled cycles per int=57.247829
+```
+
+It didn't change the cycle times, but we can do more cycles per second
+so it was an overall win.  
+
+However, at some level these result seem weird:
+  - Since both GPIO and memory access times get faster at different
+    rates than the clock, why do these cycle counts not change?
+I don't know the answer; open question.
+
+
+
