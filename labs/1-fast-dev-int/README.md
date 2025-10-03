@@ -1573,7 +1573,7 @@ ave cost = 98.050003
 ```
 
 ----------------------------------------------------------------------
-### Now what?
+### Now what? (9/31/25)
 
 At this point I'm out of ideas other than over-clocking the pi.  If you're
 in 340lx and can get consistent better times I'll give you $100 :).
@@ -1588,14 +1588,17 @@ interrupts, this would work out to potentially 7.1M interrupts per second:
   - (700M cycles / sec) / (98 cycles) = 7.1M.
 
 
-My hope is that over-clocking will let us double these numbers.  TBD!  (UPDATE:
-it did, see below.) You can read about the mailbox interface at:
+My hope is that over-clocking will let us double these numbers.  TBD!  
+You can read about the mailbox interface at:
   - [mailboxes](https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface)
   - [240lx lab 1](https://github.com/dddrrreee/cs240lx-25spr/tree/main/labs/1-mailboxes)
   - [Overclock flags and
   settings](https://www.raspberrypi.com/documentation/computers/config_txt.html#overclocking-options). This is from the rpi foundation --- you'll need
     to scroll down a bunch to get to the flags table.
 
+
+UPDATE:
+  - Overclocking did help alot!  See step 17 below.  
 
 ----------------------------------------------------------------------
 ### Step 16: James and Sai's $100 bounty hack: low-latency interrupts.
@@ -1680,7 +1683,7 @@ ave cost = 94.050003
 Given all the time I spent thinking about this problem, it's $100 well spent!
 
 ----------------------------------------------------------------------
-### Update: Step 17: overclocking.
+### Step 17: overclocking.
 
 UPDATE:  I worked on overclocking some the day after and got about a 40% speedup:
 from 94 cycles down to 57.2.  This gives about 12.2 million interrupts per second
@@ -1762,13 +1765,8 @@ Correctness notes:
 
 There's still some tweaking that can be done, and probably some other
 overclock settings to mess with.   If you find any new overclocking
-tricks let me know!  The main idea I have left is rewrit
+tricks let me know!   I'm sure it can be pushed somewhat further.
 
-My main idea for improving the code is to eliminate almost all measurement
-overhead by changing the code from measuring the cost of 1 interrupt to
-measuring the cost of many and dividing this time down.  This is a form
-of batching --- one of the most widely applicable optimization tricks ---
-so is actually a nice example to end on.
 
 The detailed results from the run:
 ```
@@ -1802,7 +1800,17 @@ so it was an overall win.
 However, at some level these result seem weird:
   - Since both GPIO and memory access times get faster at different
     rates than the clock, why do these cycle counts not change?
-I don't know the answer; open question.
+I don't know the answer; open question. 
 
 
+----------------------------------------------------------------------
+### Step 18: batching
 
+Our final step falls under the category:
+  - "When you can't win the game, throw the board and change the rules."
+
+My main idea for improving the code is to eliminate almost all measurement
+overhead by changing the code from measuring the cost of 1 interrupt to
+measuring the cost of many and dividing this time down.  This is a form
+of batching --- one of the most widely applicable optimization tricks ---
+so is actually a nice example to end on.
