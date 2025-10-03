@@ -700,6 +700,17 @@ If you look at the interrupt handler we've removed one instruction.
     8070:   e5832000    str r2, [r3]
     8074:   e12fff1e    bx  lr
 ```
+NOTE:
+  - Javier Nieto (140e'25) pointed out that we can trivially get rid of
+    the move instruction at 8060 by exploiting the fact that we can signal
+    an interrupt occured by writing any non-zero value (it doesn't have
+    to be 1) to the global register (8064).  We can instead write either
+    the constant stored in r2 (at 806c) or the GPIO event clear address
+    (at 8068).  Since it causes less of a pipeline dependency, I expect
+    that the former will work better.
+
+    With all that said: since we are removing much of this code in the
+    steps below, we currently just leave it.
 
 
 This gives us a modest speedup from 552 cycles to 546.  However,
