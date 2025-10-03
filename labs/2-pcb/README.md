@@ -325,7 +325,7 @@ An extremely common issue that people ran into was creating a filled zone "islan
 
 ![PCB Island](img/pcb_island.png) 
 
-Notice how the two traces have created an almost closed-loop, which cuts off a section of the filled zone into an island that's disconnected from the rest. An easy fix is to open the closed loop by moving one or more of the segments of the traces onto the other layer. If you go to the select mode (`Esc`), then click on a piece of trace, then hit `E`, then swap the layer to the other layer. You can then go and place vias (`Ctrl+Shift+V`, or `Cmd+Shift+V` for mac?) on each end of the segment that you flipped to the other side to make electrical connection.
+Notice how the two traces have created an almost closed-loop, which cuts off a section of the filled zone into an island that's disconnected from the rest. An easy fix is to open the closed loop by moving one or more of the segments of the traces onto the other layer. If you go to the select mode (`Esc`), then click on a piece of trace, then hit `E`, then swap the layer to the other layer. You can then go and place vias (`Ctrl+Shift+V`, or `Opt+V` for mac?) on each end of the segment that you flipped to the other side to make electrical connection.
 
 ![PCB No Island](img/pcb_noisland.png)
 
@@ -354,13 +354,13 @@ You have silkscreen that is either drawn off the edge of the board, or overlaps 
 * `M`: move (after selecting a footprint)
 * `R`: rotate (after selecting a footprint)
 * `F`: flip footprint (after selecting a footprint)
-* `Ctrl+Shift+Z` (or `Cmd+Shift+Z` on Mac?): create filled zone
+* `Ctrl+Shift+Z` (or `Opt+Z` on Mac?): create filled zone
 * `B`: fill zones
 * `X`: route trace
 * `V`: swap active copper layer (front to back or vice versa)
-* `Ctrl+Shift+V` (or `Cmd+Shift+V` on Mac?): create via
+* `Ctrl+Shift+V` (or `Opt+V` on Mac?): create via
 * `E`: edit properties
-* `Ctrl+Shift+T` (or `Cmd+Shift+T` on Mac?): add text (in silkscreen layer)
+* `Ctrl+Shift+T` (or `Opt+T` on Mac?): add text (in silkscreen layer)
 
 ### PCB Editor Tools
 * Tools->Update PCB From Schematic: Apply any updates from the schematic editor (make sure to save in schematic editor)
