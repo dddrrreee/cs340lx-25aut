@@ -767,11 +767,13 @@ code.  (This dynamic is not uncommon!)
 
 Advantages:
   1. Inlining the C interrupt handler into the assembly trampoline removes
-     the jump to (and return from C code).  Removing the control
-     flow instructions is good, and also reduces cache and prefetch
-     buffer problems.   It also lets us more easily optimize across the
-     trampoline and inlined code.  We've already seen how inlining C
-     code helps the compiler, but it also helps hand optimization.
+     the jump to (and return from C code).  Removing the control flow
+     instructions is good, and also reduces cache and prefetch buffer
+     problems.   (You've almost certainly had to deal with these a couple
+     of times in this lab, even if you don't yet realize it!)  It also
+     lets us more easily optimize across the trampoline and inlined code.
+     We've already seen how inlining C code helps the compiler, but it
+     also helps hand optimization.
 
   2. Once we've done step 1, we can then play games with the registers
      that the C compiler can't necessarily. 
@@ -831,6 +833,10 @@ After doing so I got almost a 40% improvement!
 ave cost = 342.950012
 ```
 
+As you can see here --- the win from writing assembly code often isn't
+that you found a better instruction than the compiler, it's that you did
+things the compiler cannot (at least in its current form).  E.g., inlining
+C code into assembly, knowing it can use the global registers, etc.
 
 ----------------------------------------------------------------------
 ### Step 8: cleanup
@@ -838,10 +844,10 @@ ave cost = 342.950012
 Now that the code is inlined we can make two other changes to the interrupt
 handling code.
 
-First, currently the interrupt handler modifies the exception pc by doing
-a subtract as the first instruction.  It later do a `movs` of this result
-into the pc to return from the interrupt.  We can combine these and just
-do a single `subs`.
+First, currently the interrupt handler above modifies the exception
+pc by doing a subtract as the first instruction (83a0).  It later do a
+`movs` of this result into the pc to return from the interrupt (83c4).
+We can combine these and just do a single `subs`.
 
 Our second sleazy change is to get rid of the initial jump to the
 interrupt trampoline.  Since we do not have any other exceptions or
@@ -908,20 +914,30 @@ Not a bad speedup for not thinking hard:
 ave cost = 327.149993
 ```
 
+Note: 
+  - Another way to shave an instruction off (8378) would be to preload
+    the interrupt stack pointer register with the right value at
+    initialization time.  We are going to eliminate the stack entirely
+    (below) so don't bother doing so.
+
 ----------------------------------------------------------------------
 ### Step 9: do it as a "fast interrupt" (FIQ)
 
 Looking at the machine code, we still push and pop two registers, which
 means we have to have a stack pointer, as well as some extra management.
-We can eliminate all of this by using "fast interrupt" mode.  If you
-look in chapter 4 of the armv6 document you can see that FIQ mode has
-six shadow registers, (R8 through R14).
+We can eliminate all of this by using "fast interrupt" mode, which has
+many private copies of registers.  (Because they are private we don't
+have to save and restore them when entering or leaving FIQ mode.)
+
+At a more detailed level, if you look in chapter 4 of the armv6
+architecture manual (i.e., not the arm1176 manual) you can see that FIQ
+mode has 5 additional shadow registers, R8 through R12:
 
 <img src="images/shadow-regs-pA2-5.png" width="450" />
 
-How do we do this?  If you look at the BCM interrupt chapter you
-can see how to set up the FIQ.  For a discussion of this chapter
-and device interrupts (though not FIQ) see 140e's [lab 8 "device
+How do we setup FIQ for GPIO interrupts?  If you look at the BCM interrupt
+chapter you can see how to set up the FIQ.  For a discussion of this
+chapter and device interrupts (though not FIQ) see 140e's [lab 8 "device
 interrupts"](https://github.com/dddrrreee/cs140e-25win/tree/main/labs/8-device-int).
 
 The FIQ reg itself:
@@ -942,9 +958,11 @@ versions of my gpio interrupt routines that setup the FIQ instead.
     void gpio_fiq_async_rising_edge(unsigned pin);
     void gpio_fiq_async_falling_edge(unsigned pin);
 
-And use these during setup.  I also made a special FIQ table, and an FIQ
-initialization routine (called from `test_cost`) in assembly to initialize
-the FIQ registers.
+And use these during setup.  These are checked into libpi, so you can just call
+them.
+
+I also made a special FIQ table, and an FIQ initialization routine
+(called from `test_cost`) in assembly to initialize the FIQ registers.
 
 So `notmain` becomes:
 
@@ -996,11 +1014,10 @@ These are:
   2. 8420: One coprocessor move to indicate the interrupt occurred
   3. 8424: One instruction to jump back to the interrupted code.
 
-This gives a great performance improvement: average 268 cycles.  Which is
-almost 12x faster than our original code!  A cost that brings us up to
-to about 2.6 *million* interrupts per second!  (700M cycles per sec /
-267 cycles = 12.6M.)
-
+This gives a great performance improvement: average drops from 327 to
+268 cycles.  Which is almost 12x faster than our original code!  A cost
+that brings us up to to about 2.6 *million* interrupts per second!
+(700M cycles per sec / 267 cycles = 12.6M.)
 ```
 0: rising	= 255 cycles
 1: falling	= 272 cycles
@@ -1025,6 +1042,7 @@ to about 2.6 *million* interrupts per second!  (700M cycles per sec /
 ave cost = 267.800018
 ```
 
+----------------------------------------------------------------------
 #### Interesting weird timing
 
 In the FIQ interrupt handler we:
@@ -1043,7 +1061,8 @@ registers and cycle counter.)
 
 This is easy.  We turn on the icache and branch prediction and add a
 couple lines to measure both with and without.  If you're lazy you can
-just call the libpi routine `caches_enable()`.
+enable the branch prediction cache and icache by just calling
+the libpi routine `caches_enable()`.
 
 This makes almost a 40% difference!   Great!
 ```
@@ -1071,11 +1090,11 @@ caches on
 ave cost = 167.750000
 ```
 
-As usual we have a large cost for the first value. We can eliminate
-this by either doing a warmup run (try it and see!) or a doing a prefetch 
-into the icache.  
+As usual we have a large cost for the first value. We can eliminate this
+by either doing a warmup run (try it and see!) or a doing a prefetch
+into the icache (we do this later for completeness).
 
-
+----------------------------------------------------------------------
 #### Interesting weird timing
 
 One interesting thing: if you turn off branch prediction, the variance
@@ -1135,13 +1154,17 @@ My C code looks like:
         e = cycle_cnt_read();
 ```
 
-If you look at the measurement code's assembly in `gpio-int.list`, it
-should look something like the following (note your code addresses will
-be different!);
+If you look at the machine code generated from this snippet
+`gpio-int.list`, it should look something like the following (note your
+code addresses will be different!);
+
 ```
+    ...
+             # 1. wait until interrupt sets global flag 
     8168:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
     816c:   e3530000    cmp r3, #0
     8170:   0afffffc    beq 8168 <test_cost+0x108>
+             # 2. measure the cycle
     8174:   ee1f4f3c    mrc 15, 0, r4, cr15, cr12, {1}
 ```
 
@@ -1159,11 +1182,10 @@ pure measurement overhead.
 If you think about it, in some sense these instructions are redundant.
 We can compute the same result --- that the interrupt handler has (1)
 been invoked and (2) has completed --- by having the interrupt handler
-branch to instruction 8174 when it returns!    
+branch to instruction 8174 when it returns from the interrupt!    
 
 This guarantees the same ordering --- that we read the cycle counter only
 after the interrupt handler completes --- but without the extra steps.
-
 
 There's various ways to make this change.  However, you probably need to 
 write the measurement code in assembly so that:
@@ -1187,7 +1209,7 @@ in the GPIO address to write to, and the constant to write:
 
 My assembly code looks sort-of like:
 ```
-    r3 = resume_label
+    ldr r3, =resume_label  # asm syntax to load a labl
     r2 = read cycle counter
     @ infinite loop
     inf: 
@@ -1232,6 +1254,7 @@ With the icache on this got me down to:
 ave cost = 114.849998
 ```
 
+----------------------------------------------------------------------
 #### interesting weird.
 
 Repeating the weirdness we noticed earlier with global registers, this
@@ -1246,7 +1269,7 @@ But this is not great form.
 It's now getting hard to shave cycles and and each return is somewhat
 meager.  But we keep at it.
 
-If you notice we are using sync GPIO events, we can switch to async
+If you notice we are using "sync" GPIO events, we can switch to "async"
 for a couple cycles.
 
 From the GPIO chapter in the BCM2835 document (starting page 90) if
@@ -1267,6 +1290,8 @@ two new GPIO routines to do so:
     gpio_fiq_async_rising_edge(in_pin);
     gpio_fiq_async_falling_edge(in_pin);
 
+These are checked into libpi so you can just call them.  Of course, it's
+best to write your own!
 
 This dropped me down two cycles.
 ```
@@ -1329,10 +1354,10 @@ with the icache on:
 ave cost = 106.750000
 ```
 
-My speculation for the improvement: during normal execution the CPU is 
+My speculation for the improvement: during normal execution the CPU is
 computing a bunch of state. When an interrupt happens, this state either
-must be saved or rolled back --- both cost time. Wait for interrupt
-puts the CPU in in a quiescent state where nothing else is going on.  When
+must be saved or rolled back --- both cost time. Wait for interrupt puts
+the CPU in a quiescent state where nothing else is going on.  Thus, when
 the interrupt happens the CPU can jump right to the interrupt handler.
 
 ----------------------------------------------------------------------
@@ -1347,7 +1372,7 @@ speed in any way, but on the arm1176 virtual memory gives us (at least)
 two ways to speed up our code:
 
   1. With virtual memory off, the access rules for BCM device memory
-     kdefault to "strongly ordered".  If you look at the other rules
+     default to "strongly ordered".  If you look at the other rules
      (6-15) you see there is also a "device shared" and a "device
      not shared".  With some simple tests, it appears that both reads
      and write for device shared are faster than strongly ordered.
@@ -1408,7 +1433,8 @@ Then I did the following:
             MEM_wb_alloc   =  TEX_C_B(    0b001,  1, 1),
 
 
-After the first couple invocations, it got down to 99 cycles:
+After the first couple invocations, it got down to a completely
+flat (zero variance!) 99 cycles:
 
 ```
 vm on, caches on
