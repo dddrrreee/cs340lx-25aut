@@ -1809,8 +1809,39 @@ I don't know the answer; open question.
 Our final step falls under the category:
   - "When you can't win the game, throw the board and change the rules."
 
-My main idea for improving the code is to eliminate almost all measurement
-overhead by changing the code from measuring the cost of 1 interrupt to
-measuring the cost of many and dividing this time down.  This is a form
-of batching --- one of the most widely applicable optimization tricks ---
-so is actually a nice example to end on.
+We now change the rules so that we can eliminate almost all measurement 
+overhead.  
+  1. Our original code measures the cost of 1 interrupt.  Doing it this
+     way was a (deliberate) interesting challenge because as the code
+     gets faster, the measurement itself becomes a significant source
+     of overhead and perturbation.  
+
+     This problem is the hackers version of the Heisenberg Uncertainty
+     Principle.  The intrusiveness of monitoring is always present when
+     doing performance tuning, so it was a useful problem to work through.
+
+  2. Our new code shows how to reduce such overhead to an arbitrary
+     infinitesimal by measuring the cost of taking 100K interrupts
+     (or some other large number) and dividing this time by the number
+     by 100K.  We lose the ability to measure variance, but we gain
+     a massive upper bound.
+
+     This hack is a form of "batching" --- one of the most widely
+     applicable optimization tricks --- so is actually a nice example
+     to end on.
+
+The numbers I got on my overclocked pi:
+  - Interrupts = 100,000:
+  - Total cycles = 893072 
+  - Average cost = 8.930720 cycles.
+  - Interrupt per sec = 128.769007M
+  - Scaled cycles per interrupt: 5.436090
+  - Cost per interrupt: 7.765843 nanoseconds.
+
+128 million interrupts per second on the pi is wild, and trashes all
+the estimates I could find either in forums and or LLMs.    
+
+Further, note we can push this rate even higher since we are generating
+the interrupts as well, not just taking them.  I'm somewhat optimistic we
+can turn the code into a wildly fast logic analyzer with very low error
+(upcoming).
