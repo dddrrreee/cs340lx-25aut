@@ -1,8 +1,9 @@
-### Quick lidar lab (do it with 3-hdmi!)
 
 <p align="center">
 <img src="images/okdo-lidar.png" width="400" />
 </p>
+
+### Quick lidar lab (do it with 3-hdmi!)
 
 As promised, we get fancier devices than 240lx.  Today's is the okgo ld06
 lidar!    From the datasheet(s):
