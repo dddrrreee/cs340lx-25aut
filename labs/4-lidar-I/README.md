@@ -61,7 +61,7 @@ Some visual ideas:
 ### Checkoff: do a micro-project
   
 Pretty simple:
-  1. You can display the results on your screen.
+  1. You can display the lidar results on your pi's HDMI screen.
   2. You do something cute with it over the weekend, report back on tues
      (assuming things go well).
 
