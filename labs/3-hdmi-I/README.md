@@ -6,7 +6,9 @@ This week:
   - we'll do a couple open ended labs (hdmi + lidar) with minimal starter 
     code or prose and see how it goes.
   - One you get the basic parts working, you should do a mini-project
-    that does something fun.
+    that does something fun.  We'll grade these on a check, check-plus, 
+    plus-plus.  If you have a few plus-plus extensions you'll definitely
+    get an A+.  (If they are good enough, they sub for a final project.)
   - Report back next week!
   - There is now a [cs340lx-25aut-contrib repository](https://github.com/dddrrreee/cs340lx-25aut-contrib) --- if you do a cute trick or build a cool hack, make a directory with your
     name in the contrib repository and push so other people can use them.
@@ -170,6 +172,35 @@ animations fast by double buffering.
 ----------------------------------------------------------------------
 ### Micro-project options
 
-There's many other commands for the framebuffer.   Use them to do 
-interesting hacks (e.g., fast animations).
+Some simple ideas:
+  - There's many other commands for the framebuffer.   Use them to do 
+    interesting hacks (e.g., fast animations).
+  - See how fast you can make a fractal go in the style of lab 1.  
+    Make a record of each optimization and the speedup.  Am curious
+    how far this can be pushed.  
 
+Moderate fun:
+  - Display your IMU orientation in real time.
+  - Turn any of the other device labs into an interesting visualizations.
+  - Make your own embedded video picture frame and display favorite
+    photos.  You can either use a bitmap or port one of the small
+    JPG decoder libraries out there.  (Someone please do this so
+    we can all use it!)
+  - Write your own visualization library. Given how horribly complex
+    GUI libraries are, this can give a fast, fluent way to do 
+    interesting things.
+  - Make a logic analyzer based on lab 1. (Decent chance we'll  do 
+    something like this in a week or so: might as well get credit early!)
+
+Some bigger ideas:
+  - Take your 240lx GPU code and use it to write directly to the 
+    frame buffer (that's what it's for!)
+  - Even more ambitious: use the shader, etc in the GPU to display
+    something interesting.  This is definitely possible, but I have
+    no idea how to do so, so am very interested :)
+  - Use the VPU (not the GPU) to compute and display.  There's a 
+    secondary but weird processor on the bcm side that we've not
+    been using --- perhaps something can be done with it.
+  - Write your own window manager for your pi.  
+
+This is a tiny set of possibles --- lmk if you come up w/ other cute ones.
