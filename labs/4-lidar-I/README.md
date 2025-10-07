@@ -64,7 +64,7 @@ How:
   - Connect the lidar to a tty-serial device.
   - Adapt the `my-install.c` code from the bootloader lab to read
     from the `/dev/` mount point.
-  - Why: Most people use "screend" to interaact with ttyUSB devices, 
+  - Why: Most people use "screend" to interact with ttyUSB devices, 
     but (1) "screend" is annoying and (2) you can't pull its
     results into computation (eg decode the packets)
   - Later you can use variants of this code to program a bunch of 
@@ -85,7 +85,7 @@ What to do:
 
 Note: 
   - You will have to find the start of each packet.  This has some
-    mild ugliness since the packet sentinal could also appear in the
+    mild ugliness since the packet sentinel could also appear in the
     packet data.  So (ideally) you probably want to find an alignment 
     that gives you multiple packets in a row.  Likely it's more 
     natural to read a large a chunk as possible.  
@@ -118,7 +118,7 @@ Some visual ideas:
   - Adapt `lidar-cat` so that you can display on your laptop.  
   - Make a movement reactive picture on your screen that distorts
     based on position or variance.
-  - Use your stepper moter to follow where the lidar detects movement.
+  - Use your stepper motor to follow where the lidar detects movement.
     (Joseph style: Put something dangerous on it?)
   - If you have speakers from 240lx: Use the lidar to create a theramin.
     It provides a very rich set of input data that should make

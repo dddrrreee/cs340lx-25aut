@@ -1,10 +1,10 @@
-### Bare-metal Framebuffer on the pi.
+### Bare-metal Frame-buffer on the pi.
 
 ----------------------------------------------------------------
 #### Housekeeping
 
 This week:
-  - we'll do a couple open ended labs (hdmi + lidar) with minimal starter 
+  - We'll do a couple open ended labs (hdmi + lidar) with minimal starter 
     code or prose and see how it goes.
   - One you get the basic parts working, you should do a mini-project
     that does something fun.  We'll grade these on a check, check-plus, 
@@ -110,14 +110,14 @@ mailbox commands in the specified order:
      or your physical screen might not be that large.
   2. Set virtual (buffer) width/height (Tag: 0x00048004).  You must
      check this result as in step 1.  If it's different, something
-     went wrong!   FWIW, when I started breaking the messsage into pieces,
+     went wrong!   FWIW, when I started breaking the message into pieces,
      these numbers were always 2.
   3. Set depth (Tag: 0x00048005).  Depth is bits per pixel.  You must check
      the result since hardware can force what is possible: 0 means unsupported.
   4. Set pixel order (Tag: 0x00048006).  Confusing name to denote:
      0 = colors ordered BGR (blue green red), 1 = colors ordered RGB.
      You must check because the hardware can force this.
-  5. Allocate (frame) buffer (Tag: 0x00040001).  Returns the framebuffer
+  5. Allocate (frame) buffer (Tag: 0x00040001).  Returns the frame-buffer
      address and size in bytes.  You must check.  If the previous values
      have problems, you get back 0.  If you get an address it will be 
      in GPU memory, so you have to mask off the upper bits as we have
