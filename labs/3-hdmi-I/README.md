@@ -1,5 +1,6 @@
 ### Bare-metal Framebuffer on the pi.
 
+----------------------------------------------------------------
 #### Housekeeping
 
 This week:
@@ -13,6 +14,7 @@ This week:
   - There is now a [cs340lx-25aut-contrib repository](https://github.com/dddrrreee/cs340lx-25aut-contrib) --- if you do a cute trick or build a cool hack, make a directory with your
     name in the contrib repository and push so other people can use them.
 
+----------------------------------------------------------------
 #### Overview
 
 Today we'll write simple bare metal driver for the HDMI display using
