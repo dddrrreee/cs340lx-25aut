@@ -137,7 +137,7 @@ Note:
 
 Hint: My message was 128 bytes declared as follows:
 ```
-   volatile unsigned msg[32] = {
+    __attribute__((aligned(16))) volatile uint32_t msg[32] = {
        128,               // [0] total size in bytes
        0,                 // [1] request = 0 (becomes 0x80000000 on success)
 
