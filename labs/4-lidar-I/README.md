@@ -17,8 +17,8 @@ inno-maker.com
     measurements per second, roughly 480 points per full rotation.
 
   - It requires minimal configuration: it starts spitting out data
-    using UART at 230,400 baud (8-N-1 format, the same as what
-    we have been using).
+    using UART at 230,400 baud (8-N-1 format --- 8 data bits, 1 stop bit,
+    no parity, no flow control --- the same as what we have been using).
 
   - The various [datasheets](./datasheets) have the packet structure.
 
