@@ -17,8 +17,10 @@ inno-maker.com
     measurements per second, roughly 480 points per full rotation.
 
   - It requires minimal configuration: it starts spitting out data
-    using UART at 230,400 baud.  
-  - The various datasheets have the packet structure.
+    using UART at 230,400 baud (8-N-1 format, the same as what
+    we have been using).
+
+  - The various [datasheets](./datasheets) have the packet structure.
 
 We are doing a James and Sai style open-ended lab: 
   - You get the device.  
