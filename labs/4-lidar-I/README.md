@@ -7,9 +7,15 @@
 
 As promised, we get fancier devices than 240lx.  Today's is the okgo ld06
 lidar!    From the datasheet(s):
-  - The LD06 uses an infrared laser spinning at 4500 times a second(!)
-    to do (relatively) precise, low-latency scanning of 360 degrees
-    around the unit.
+    - anging core operates at 4.5 kHz (4500 measurements per second)
+inno-maker.com
+inno-maker.com
+. The LiDAR outputs roughly 480 distance points per full rotation (approx. 12 points per 7.2° data packet, see protocol below).
+
+  - The LD06 spins a class 1 laser to do (relatively) precise, low-latency
+    scanning of 360 degrees around the unit.  It generates 4500
+    measurements per second, roughly 480 points per full rotation.
+
   - It requires minimal configuration: it starts spitting out data
     using UART at 230,400 baud.  
   - The various datasheets have the packet structure.
