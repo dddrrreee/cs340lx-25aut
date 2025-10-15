@@ -1,5 +1,6 @@
 # Makefile to build or clean all labs.
-SUBDIRS += using-float
+SUBDIRS += using-float using-hardfloat-libgcc 
+# using-libvm-ident
 
 .PHONY: all check clean
 all check clean: $(SUBDIRS)
