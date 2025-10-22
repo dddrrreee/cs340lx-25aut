@@ -69,7 +69,7 @@ tl;dr:
 ### Background: The rules
 
 <p float="center">
-    <img src="images/bcm2835-mem-ordering.png">
+    <img src="images/bcm2835-mem-ordering.png"  width="600">
 </p>
 
 Recall the memory ordering rules from the bcm2835 document:
