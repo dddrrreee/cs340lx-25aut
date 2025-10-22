@@ -223,9 +223,19 @@ three code snippets:
 ```
 
 
-How much faster are 2 and 3 compared to no barriers?  I never would have
-thought this could be true.  Might be part of the reason that lab 1 had
-some weird speedups.
+How much faster are 2 and 3 compared to no barriers?  For my code:
+```
+COMPARISON:
+  No barrier: 130 us (baseline)
+  DMB:        79 us (39.230770% improvement)
+  DSB:        79 us (39.230770% improvement)
+```
+I never would have thought *adding* barriers would speed up code. 
+  - NOTE: Might be part of the reason that lab 1 had some weird speedups.
+
+The current belief is that they force the values to be written out rather
+than sitting in the arm1176's write buffer.  The sooner they are written
+out, the sooner they change the GPIO pad and thus the read back value.
 
 Note, as before to maximize the error:
   1. Make sure all the calls are inlined and what is being
@@ -234,7 +244,7 @@ Note, as before to maximize the error:
   3. For this code I did do the change suggested in part 1: put the printing
      after all my measurements and used instruction prefetching:
 
-```
+```c
 #include "asm-helpers.h"
 cp_asm_set(prefetch_icache_mva, p15, 0, c7, c13, 1)
 
@@ -249,20 +259,6 @@ static void prefetch_inst(void *start, void *end) {
 ```
 
 
-My numbers:
-
-```
-COMPARISON:
-  No barrier: 130 us (baseline)
-  DMB:        79 us (39.230770% improvement)
-  DSB:        79 us (39.230770% improvement)
-```
-
-
-A huge improvement from using barriers.  The current belief is that they
-force the values to be written out rather than sitting in the arm1176's
-write buffer.  The sooner they are written out, the sooner they get
-read back.
 
 
 -------------------------------------------------------------------
