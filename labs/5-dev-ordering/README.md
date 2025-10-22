@@ -281,6 +281,11 @@ static void prefetch_inst(void *start, void *end) {
 -------------------------------------------------------------------
 ### 3. Device configuration is not guaranteed to complete before use.
 
+
+***NOTE***:
+  - At least for gpio where you change the ouput, I can't figure out a way 
+    to make the below work (see discussion at the end) 
+
 Until today, our pattern for device configuration and use has been:
 
   1. Configure devices (GPIO, UART, SPI etc) using loads and stores to
@@ -321,6 +326,71 @@ Keep the hardware as before.  Simple code example:
         state 0.
 
 How many errors do you get?
+
+
+#### I couldn't get this bug to show up for GPIO.
+
+The main challenge here is to do the 
+the following in two instructions:
+  1. Change to `out_pin` back to output
+  2. Write a 1 to it.
+
+If you disassemble your code it's probably initially huge.
+
+To have better control and easier debugging, I put both steps
+in their own routine so I could easily inspect:
+
+```
+// set to output, write a 1.
+// <bank> = the GPIO function bank to write to. 
+// <loop> = the loopback config
+// <set> = the GPIO set register to write to.
+void change_conf(uint32_t bank, uint32_t loop, uint32_t set) {
+    asm_align(5);
+    PUT32_raw(bank, loop);          // set to loopback.
+    PUT32_raw(set, 1<<out_pin);     // write 1.
+}
+```
+
+In order to defeat gcc's bad GPIO constant handling (we saw this in
+lab 1) I precomputed the bank to write to, and the two values:
+  - `loop`: `in_pin` is input, `out_pin` is output, so loopback works.
+  - `broke`: `in_pin` is input, and `out_pin` is also input so loopback
+    does not work.  
+
+```
+    // get the bank needed for out_pin (from your GPIO code.)
+    uint32_t bank = GPIO_BASE + (out_pin/10)*4;
+
+    // get the working loopback config
+    //  in = input, out = output
+    uint32_t loop = GET32_raw(bank);
+
+    // change out_pin to be an input and get that
+    // config
+    gpio_set_input(out_pin);
+    uint32_t broke = GET32_raw(bank);
+```
+
+After doing a bunch of sanity checking code to verify `loop` 
+restores the loopback and `broke` breaks it, the config-use check
+becomes:
+
+```
+    assert(GET32(bank) == broke);
+    assert(gpio_read(in_pin) == 0);
+    // quickly change back to loopback and set out_pin to 1.
+    change_conf(bank, loop, gpio_set0);
+    dev_barrier();
+    // if in_pin is still 0 we know config and set were not ordered.
+    if(gpio_read(in_pin) == 0) {
+        output("iter=%d: err!\n");
+        err += 1;
+    }
+```
+Unfortunately I never got an error.  Weird.  I do expect that the
+given issue does come up with more complicated devices (UART, SPI)
+but have not verified.  This is a great extension project!
 
 -------------------------------------------------------------------
 ### 4. Do some other error example
