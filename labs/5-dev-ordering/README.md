@@ -8,12 +8,12 @@ Today's checkoff is simple:
   2. do a new example, ideally on a different SBC.  I want to include
     them in 140e (with your name etc).
 
-#### overview
+#### Overview
 
 Since I assume everyone is either tired from doing their midterm project
 or still doing it before today's presentations, today's lab is a quick
 but startling side-quest lab on memory ordering that came up over the 
-weekend.  Some of the results were starling enough that I was mass 
+weekend.  Some of the results were unsettling enough that I was mass 
 texting screenshots to more people than are in the class :)  Hopefully
 is interesting.
 
