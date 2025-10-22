@@ -1,4 +1,14 @@
+
 ## Some very surprising memory ordering bugs.
+
+#### tl;dr
+
+Today's checkoff is simple:
+  1. Write the three examples (part 1, part 2, part 3 below).
+  2. do a new example, ideally on a different SBC.  I want to include
+    them in 140e (with your name etc).
+
+#### overview
 
 Since I assume everyone is either tired from doing their midterm project
 or still doing it before today's presentations, today's lab is a quick
@@ -264,41 +274,45 @@ static void prefetch_inst(void *start, void *end) {
 -------------------------------------------------------------------
 ### 3. Device configuration is not guaranteed to complete before use.
 
-We:
+Until today, our pattern for device configuration and use has been:
+
   1. Configure devices (GPIO, UART, SPI etc) using loads and stores to
      the memory associated with that device.
-  2. We then use the device by doing loads and stores to the same 
-     device memory as (1), though generally to different device memory
+
+  2. Then use the device by doing loads and stores to the same
+     device memory as (1),  though generally to different device memory
      offsets.
 
-By straightforward reading of the BCM2835 documents:
+Because (1) and (2) are to the same device, we have never used
+a barrier --- and in fact have told people in 140e to delete
+barriers as unnecessary because of the 
+BCM2835 document's statement (mentioned above):
 
-  - Again: as they state: "it is not required to put a memory
+  - "it is not required to put a memory
     barrier instruction after each read or write access [to the same
     device]"
 
-After configuration (1) we should be able to immediately (2) use the
-device without a memory barrier since it this use will be a load or
-store to the same device memory.
-
 As you are probably starting to realize from the first two examples,
-this is not true!   Just because 
+our belief was wrong!  Just because:
   1. We have *initiated* the loads/stores to configure a device.
   2. *And* we are *guaranteed* the subsequent load/stores to use it
      initiated after (1).
-  3. There is in fact *no guarantee* that (1) is *complete* before (2).
 
-Simple example:
+There is in fact: *no guarantee* that (1) is *complete* before (2).
 
-  0. Setup a GPIO pin P as output, write a 0: make sure when you 
-     from from it using loopback you get a 0.
+Simple code example:
+
+First setup state:
+  1. Setup a GPIO pin P as output, write a 0: make sure when you 
+     from from it using loopback you get a 0.  This is no speed critical.
+  2. Now set GPIO in P as input: do dsb so you are sure it is input.
      This is no speed critical.
-  1. Now set GPIO in P as input: do dsb so you are sure it is input.
-     This is no speed critical.
-  2. Finally, the punchline:  
-      - In two instructions, change to output and write a 1.  
-      - Do a DSB so you know it has completed.
-      - Read the input pin.   Count as an error if it is still 0.
+
+Finally, do the following punchline:  
+  1. In two instructions, change to output and write a 1.  
+  2. Do a DSB so you know (1) has completed.
+  3. Read the input pin.   Count as an error if it is still the initial
+     state 0.
 
 How many errors do you get?
 
