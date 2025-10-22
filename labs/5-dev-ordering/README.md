@@ -1,12 +1,13 @@
-
 ## Some very surprising memory ordering bugs.
 
 #### tl;dr
 
 Today's checkoff is simple:
-  1. Write the three examples (part 1, part 2, part 3 below).
+  1. Write the first two examples (part 1, part 2)
   2. do a new example, ideally on a different SBC.  I want to include
     them in 140e (with your name etc).
+  3. Currently: I can't get part 3 to fail on GPIO.  If you can this
+     is a great extension!
 
 #### Overview
 
