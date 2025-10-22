@@ -19,13 +19,13 @@ is interesting.
     with their rules) for undocumented hardware from all the ad hoc
     online sources that contain such information:
 
-        - Linux kernel code, mailing lists and commits; 
-        - BSD kernel
-        - the Circle bare metal library (thanks Andrew)
-        - all the bare metal online forums.
-        - all the bare metal githubs
-        - blogs such as iosoft
-        - ...
+     - Linux kernel code, mailing lists and commits; 
+     - BSD kernel
+     - the Circle bare metal library (thanks Andrew)
+     - all the bare metal online forums.
+     - all the bare metal githubs
+     - blogs such as iosoft
+     - ...
     
     The fact that we don't have docs for the majority of devices on the
     pi has always been a real irritant, but it was so hard that we just
