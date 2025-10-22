@@ -201,20 +201,26 @@ three code snippets:
 
   1.  No barrier.
 
+```c
         gpio_set_on_raw(out_pin);
         while (!gpio_read_raw(in_pin));
+```
 
   2. DMB
 
+```c
         gpio_set_on_raw(out_pin);
         dmb_raw();
         while (!gpio_read_raw(in_pin));
+```
 
   3. DSB
 
+```c
         gpio_set_on_raw(out_pin);
         dsb_raw();
         while (!gpio_read_raw(in_pin));
+```
 
 
 How much faster are 2 and 3 compared to no barriers?  I never would have
