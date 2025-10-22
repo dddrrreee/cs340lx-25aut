@@ -308,16 +308,16 @@ true:
 
 There is in fact: *no guarantee* that (1) is *complete* before (2).
 
-Simple code example:
+Keep the hardware as before.  Simple code example:
   1. First setup state:
-     1. Setup a GPIO pin P as output, write a 0: make sure when you 
-        from from it using loopback you get a 0.  This is no speed critical.
-     2. Now set GPIO in P as input: do dsb so you are sure it is input.
+     1. Setup GPIO `out_pin` as output, write a 0: make sure when you 
+        read from it using `in_pin` you get a 0.  This is no speed critical.
+     2. Now set GPIO `out_pin` as input: do a dsb so you are sure it is input.
         This is no speed critical.
   2. Then do the following punchline:  
-     1. In two instructions, change to output and write a 1.  
-     2. Do a DSB so you know (1) has completed.
-     3. Read the input pin.   Count as an error if it is still the initial
+     1. In two instructions, (1) change to `out_pin` back to output and 
+        (2) write a 1.  Do a DSB so you know this step has completed.
+     2. Read the input pin `in_pin`. Count as an error if it is still the initial
         state 0.
 
 How many errors do you get?
