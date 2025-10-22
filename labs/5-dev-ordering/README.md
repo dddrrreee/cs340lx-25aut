@@ -147,13 +147,12 @@ these procedure calls can take a long time.
 We'll do a few examples below.  And hopefully you can think of your 
 own and do them (ideally on another SBC!).
 
-The high bit on the examples were that I didn't think any of them 
-were problems, and yet they are.
+The high bit on the examples: After many years of 140e/240lx/340lx I
+didn't think any of them were problems, and yet they are.
 
 In fact, I wager almost all drivers have at least one of the bugs below,
 though they are likely hidden because the code is so slow that enough
 cycles pass so the issue doesn't show up.
-
 
 -------------------------------------------------------------------
 ### 1. Writing GPIO output then reading GPIO input: not sequentially consistent.
@@ -301,7 +300,8 @@ BCM2835 document's statement (mentioned above):
     device]"
 
 As you are probably starting to realize from the first two examples,
-our belief was wrong!  Just because:
+our belief was wrong!  Just because the following two statements are
+true:
   1. We have *initiated* the loads/stores to configure a device.
   2. *And* we are *guaranteed* the subsequent load/stores to use it
      initiated after (1).
@@ -309,18 +309,16 @@ our belief was wrong!  Just because:
 There is in fact: *no guarantee* that (1) is *complete* before (2).
 
 Simple code example:
-
-First setup state:
-  1. Setup a GPIO pin P as output, write a 0: make sure when you 
-     from from it using loopback you get a 0.  This is no speed critical.
-  2. Now set GPIO in P as input: do dsb so you are sure it is input.
-     This is no speed critical.
-
-Finally, do the following punchline:  
-  1. In two instructions, change to output and write a 1.  
-  2. Do a DSB so you know (1) has completed.
-  3. Read the input pin.   Count as an error if it is still the initial
-     state 0.
+  1. First setup state:
+     1. Setup a GPIO pin P as output, write a 0: make sure when you 
+        from from it using loopback you get a 0.  This is no speed critical.
+     2. Now set GPIO in P as input: do dsb so you are sure it is input.
+        This is no speed critical.
+  2. Then do the following punchline:  
+     1. In two instructions, change to output and write a 1.  
+     2. Do a DSB so you know (1) has completed.
+     3. Read the input pin.   Count as an error if it is still the initial
+        state 0.
 
 How many errors do you get?
 
