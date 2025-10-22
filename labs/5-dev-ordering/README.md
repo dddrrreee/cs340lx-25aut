@@ -76,7 +76,7 @@ tl;dr:
     is much worse, less battle-tested, and the chip fabs likely cut
     more corners.
 
-### Background: The rules
+#### Review: memory ordering rules.
 
 <p float="center">
     <img src="images/bcm2835-mem-ordering.png"  width="700">
@@ -100,7 +100,7 @@ Where a memory barrier can either be:
         dmb
         str r1, [B]
 
-    we are guaranteed that the store to A has been initiated before the
+    We are guaranteed that the store to A has been *initiated* before the
     store to B.  (Note: this does not guarantee they are complete and
     written all the way to main memory.)
 
@@ -114,6 +114,14 @@ Where a memory barrier can either be:
     before continuing. Completion is important for expensive operations
     (e.g., cache flushes) where the hardware doesn't necessarily block
     until they are done.
+
+     So for:
+```
+        <dcache_flush>
+        dsb
+        str r1, [B]
+```
+    We are guaranteed that the cache flush has completed before B.
 
 Seems fairly simple, and our heuristic has always been: 
 
