@@ -69,7 +69,7 @@ tl;dr:
 ### Background: The rules
 
 <p float="center">
-    <img src="images/bcm2835-mem-ordering.png"  width="600">
+    <img src="images/bcm2835-mem-ordering.png"  width="700">
 </p>
 
 Recall the memory ordering rules from the bcm2835 document:
@@ -85,11 +85,11 @@ Recall the memory ordering rules from the bcm2835 document:
 Where a memory barrier can either be:
   - DMB, which (roughly) ensures memory operations before the DMB have 
     been issued and memory operations after the DMB have not.   So for:
-```
-    str r0, [A]
-    dmb
-    str r1, [B]
-```
+
+        str r0, [A]
+        dmb
+        str r1, [B]
+
     we are guaranteed that the store to A has been initiated before the
     store to B.  (Note: this does not guarantee they are complete and
     written all the way to main memory.)
