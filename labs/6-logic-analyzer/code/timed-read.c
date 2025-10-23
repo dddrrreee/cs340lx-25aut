@@ -78,7 +78,9 @@ void test_cost(unsigned pin) {
 
     float sum = 0;
     uint32_t c,e;
-    for(int i = 0; i < 10; i++) {
+    enum { N = 20 };
+
+    for(int i = 0; i < N/2; i++) {
         // measure the cost of a rising edge interrupt.
         // by reading cycle counter and spinning until the
         // rising edge count increases (i.e., an interrupt
@@ -90,11 +92,17 @@ void test_cost(unsigned pin) {
         while(r == read_cur())
             ;
         e = cycle_cnt_read();
-        output("%d: rising\t= %d total cycles [%d until int ran]\n", 
+        // compute what the level was
+        let lvl = (r->lev >> in_pin) &1;
+
+        output("%d: rising  [lev=%d]\t= %d total cycles [%d until int ran]\n", 
             i*2, 
+            lvl,
             e-c,
             r->cyc -c);
         sum += e-c;
+        if(lvl != 1)
+            panic("LOG error: level not 1 on a rising interrupt\n");
 
         // measure the cost of a falling edge interrupt.
         // by reading cycle counter and spinning until the
@@ -107,9 +115,15 @@ void test_cost(unsigned pin) {
         while(r == read_cur())
             ;
         e = cycle_cnt_read();
-        output("%d: falling\t= %d total cycles [%d until int ran]\n", 
-            i*2+1, e-c, r->cyc - c);
+
+        // compute what the level was
+        lvl = (r->lev >> in_pin) &1;
+
+        output("%d: falling [lev=%d]\t= %d total cycles [%d until int ran]\n", 
+            i*2+1, lvl, e-c, r->cyc - c);
         sum += e-c;
+        if(lvl != 0)
+            panic("LOG error: level not 0 on a falling interrupt\n");
     }
     output("ave cost = %f\n", sum / 20);
 }

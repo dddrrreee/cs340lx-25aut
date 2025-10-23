@@ -215,3 +215,316 @@ they monitor.
 
 -----------------------------------------------------------------
 ### Step 0: our starting point
+
+
+As with lab 1, our first run is awful:
+```
+0: rising  [lev=1]	= 2775 total cycles [461 until int ran]
+1: falling [lev=0]	= 2591 total cycles [450 until int ran]
+2: rising  [lev=1]	= 2565 total cycles [453 until int ran]
+3: falling [lev=0]	= 2585 total cycles [450 until int ran]
+4: rising  [lev=1]	= 2588 total cycles [450 until int ran]
+5: falling [lev=0]	= 2594 total cycles [453 until int ran]
+6: rising  [lev=1]	= 2585 total cycles [450 until int ran]
+7: falling [lev=0]	= 2586 total cycles [453 until int ran]
+8: rising  [lev=1]	= 2588 total cycles [450 until int ran]
+9: falling [lev=0]	= 2591 total cycles [453 until int ran]
+10: rising  [lev=1]	= 2551 total cycles [453 until int ran]
+11: falling [lev=0]	= 2585 total cycles [450 until int ran]
+12: rising  [lev=1]	= 2585 total cycles [450 until int ran]
+13: falling [lev=0]	= 2574 total cycles [452 until int ran]
+14: rising  [lev=1]	= 2591 total cycles [450 until int ran]
+15: falling [lev=0]	= 2586 total cycles [453 until int ran]
+16: rising  [lev=1]	= 2579 total cycles [452 until int ran]
+17: falling [lev=0]	= 2583 total cycles [453 until int ran]
+18: rising  [lev=1]	= 2593 total cycles [452 until int ran]
+19: falling [lev=0]	= 2590 total cycles [458 until int ran]
+ave cost = 2593.483647
+```
+
+Bad things:
+  1. Interrupt cost is huge: average = 2593 cycles.  By default
+     the pi runs at 700MHz cycles per second, so we can do *at best*
+     about 269,957 interrupts per second (700 * 1000 * 1000 / 2593).
+
+     We can't even handle the lidar UART speed at this rate!
+
+  2. The time to the first reading (which will be the value the 
+     logic analyzer records)  bounces around significantly between
+     461 and 450 cycles.  Jitter = error, and more error = less useful.
+
+
+
+----------------------------------------------------------------------
+### Step 1: inline and compiler optimize
+
+Since we've already optimized device interrupts we speed-run the 
+first part:
+  1. Fix optimization in the Makefile: I used -Ofast, but maybe others 
+     work better for you.
+  2. Inline all GPIO routines.
+
+We get a nice speedup of 1000 cycles!
+
+```
+0: rising	= 1691 total cycles [366 until int ran]
+1: falling	= 1510 total cycles [356 until int ran]
+2: rising	= 1512 total cycles [358 until int ran]
+3: falling	= 1510 total cycles [359 until int ran]
+4: rising	= 1499 total cycles [358 until int ran]
+5: falling	= 1505 total cycles [362 until int ran]
+6: rising	= 1501 total cycles [361 until int ran]
+7: falling	= 1510 total cycles [356 until int ran]
+8: rising	= 1501 total cycles [361 until int ran]
+9: falling	= 1496 total cycles [356 until int ran]
+10: rising	= 1498 total cycles [358 until int ran]
+11: falling	= 1499 total cycles [359 until int ran]
+12: rising	= 1518 total cycles [358 until int ran]
+13: falling	= 1514 total cycles [359 until int ran]
+14: rising	= 1501 total cycles [361 until int ran]
+15: falling	= 1505 total cycles [356 until int ran]
+16: rising	= 1501 total cycles [361 until int ran]
+17: falling	= 1496 total cycles [359 until int ran]
+18: rising	= 1521 total cycles [361 until int ran]
+19: falling	= 1502 total cycles [360 until int ran]
+ave cost = 1514.500000
+```
+
+----------------------------------------------------------------------
+### Step 2: replace `dev_barrier` with `dmb` inlined.
+
+
+If you look in `libpi/staff-src/mem-barrier.S` you'll see that our device
+barrier uses the DSB instruction.  If you recall from the virtual memory
+lab in 140e, this is the most complicated barrier, and so unsurprisingly
+is the most expensive.  But even if we leave it as a `dsb`: as we've
+already seen, function calls kill performance so inline it.
+
+
+We can instead use DMB (as seen in `mem-barrier.S`):
+```
+.globl dmb
+dmb:
+    mov r0, #0
+    mcr p15, 0, r0, c7, c10, 5
+    bx lr
+```
+
+By changing it to a static inline routine:
+
+```
+static inline void dmb_raw(void) {
+    uint32_t r0 = 0;
+    asm volatile("mcr p15, 0, %0, c7, c10, 5" :: "r"(r0));
+}
+```
+
+Which gives us another few hundred cycles without trying:
+
+```
+0: rising	= 1321 total cycles [348 until int ran]
+1: falling	= 1133 total cycles [342 until int ran]
+2: rising	= 1216 total cycles [343 until int ran]
+3: falling	= 1130 total cycles [339 until int ran]
+4: rising	= 1131 total cycles [344 until int ran]
+5: falling	= 1129 total cycles [339 until int ran]
+6: rising	= 1131 total cycles [343 until int ran]
+7: falling	= 1132 total cycles [342 until int ran]
+8: rising	= 1134 total cycles [343 until int ran]
+9: falling	= 1130 total cycles [339 until int ran]
+10: rising	= 1134 total cycles [343 until int ran]
+11: falling	= 1129 total cycles [342 until int ran]
+12: rising	= 1137 total cycles [343 until int ran]
+13: falling	= 1129 total cycles [342 until int ran]
+14: rising	= 1131 total cycles [343 until int ran]
+15: falling	= 1133 total cycles [342 until int ran]
+16: rising	= 1131 total cycles [340 until int ran]
+17: falling	= 1133 total cycles [342 until int ran]
+18: rising	= 1131 total cycles [343 until int ran]
+19: falling	= 1129 total cycles [342 until int ran]
+ave cost = 1145.200073
+```
+
+
+NOTE:
+  - Maybe try with dsb to see if any difference?  I'm curious
+    after the last lab but forgot to try.
+
+  - Weird thing: if we eliminate the DMB between GPIO and event clear
+    my code didn't get faster. I'm not sure what is going on.  For the
+    moment we are going to cut so much additional stuff that I didn't
+    worry about it (but it does make me uneasy).
+
+----------------------------------------------------------------------
+### Step 3: [NEW] replace interrupt sanity check with `assert`
+
+If you look at `int_vector`'s machine code it's huge:
+
+```
+    8060:   e92d4070    push    {r4, r5, r6, lr}
+    8064:   ee1f4f3c    mrc 15, 0, r4, cr15, cr12, {1}
+    8068:   e3a01000    mov r1, #0
+    806c:   ee071fba    mcr 15, 0, r1, cr7, cr10, {5}
+    8070:   e59f2054    ldr r2, [pc, #84]   ; 80cc <int_vector+0x6c>
+    8074:   e59f0054    ldr r0, [pc, #84]   ; 80d0 <int_vector+0x70>
+    8078:   e59fe054    ldr lr, [pc, #84]   ; 80d4 <int_vector+0x74>
+    807c:   e590c034    ldr ip, [r0, #52]   ; 0x34
+    8080:   e5923000    ldr r3, [r2]
+    8084:   e2835008    add r5, r3, #8
+    8088:   e5825000    str r5, [r2]
+    808c:   e5922000    ldr r2, [r2]
+    8090:   e5834004    str r4, [r3, #4]
+    8094:   e152000e    cmp r2, lr
+    8098:   e583c000    str ip, [r3]
+    809c:   8a000004    bhi 80b4 <int_vector+0x54>
+    80a0:   ee071fba    mcr 15, 0, r1, cr7, cr10, {5}
+    80a4:   e3a03302    mov r3, #134217728  ; 0x8000000
+    80a8:   e5803040    str r3, [r0, #64]   ; 0x40
+    80ac:   ee071fba    mcr 15, 0, r1, cr7, cr10, {5}
+    80b0:   e8bd8070    pop {r4, r5, r6, pc}
+    80b4:   e3a0303f    mov r3, #63 ; 0x3f
+    80b8:   e59f2018    ldr r2, [pc, #24]   ; 80d8 <int_vector+0x78>
+    80bc:   e59f1018    ldr r1, [pc, #24]   ; 80dc <int_vector+0x7c>
+    80c0:   e59f0018    ldr r0, [pc, #24]   ; 80e0 <int_vector+0x80>
+    80c4:   eb000123    bl  8558 <printk>
+    80c8:   eb0002cd    bl  8c04 <clean_reboot>
+    80cc:   000099e8    .word   0x000099e8
+    80d0:   20200000    .word   0x20200000
+    80d4:   00009df0    .word   0x00009df0
+    80d8:   000095ec    .word   0x000095ec
+    80dc:   000093e0    .word   0x000093e0
+    80e0:   000093f0    .word   0x000093f0
+
+```
+
+And it's doing a bunch of stores and loads to the same address
+that seems redundant:
+
+    8088:   e5825000    str r5, [r2]
+    808c:   e5922000    ldr r2, [r2]
+
+
+what is going on?
+
+Couple things:
+  1. We have declared the current timed read pointer `tr` as a `volatile`
+     pointer (i.e., the pointer itself can change, not just the contents).
+     This means each access must reload it.  [Add link to Linus rant on 
+     `volatile` versus memory barriers).
+
+  2. One cause of the reload is that we have a sanity check in the
+     interrupt handler:
+
+            if(tr > t_end)
+                panic("overflow\n");
+
+     Sanity checks are great, and I encourage them!  I've been saved
+     many times because of an "impossible" check that caught an error.
+
+     But life is about tradeoffs, and error checks on critical paths
+     cost you.  For this we use a standard satisficing trick that switches
+     such checks to an `assert` macro, which is in turn can be enabled or
+     disabled quickly by defining a preprocessor variable:
+
+
+
+```
+// libpi/libc/demand.h
+#ifdef __NDEBUG__
+#   define assert(bool) do { } while(0)
+#else
+    #   define assert(bool) do {                                   \
+        if((bool) == 0) {                                       \
+            debug("ERROR: Assertion `%s` failed.\n", #bool);      \
+            clean_reboot();                                     \
+        }                                                       \
+    } while(0)
+#endif
+
+```
+Here if you `#define __NDEBUG__` before the `#include "demand.h"
+inclusion, `assert` will get replaced by an empty loop.
+
+
+NOTE: 
+ - We use an empty do-while loop because if you define it as
+   an empty statement (e.g., `#define assert(bool) (void)0`), some
+   compilers will give a warning.
+ - If you have a side-effect in the assert (don't do this!)
+   the side-effect will go away, breaking the code.
+
+
+Doing this cuts down the size of the interrupt handler by almost
+1/2, largely due to the weird constant loads the compiler emits
+to get both global pointers (`tr` and `t_end`).
+```
+    8060:   e92d4010    push    {r4, lr}
+    8064:   ee1fef3c    mrc 15, 0, lr, cr15, cr12, {1}
+    8068:   e3a02000    mov r2, #0
+    806c:   ee072fba    mcr 15, 0, r2, cr7, cr10, {5}
+    8070:   e3a0c302    mov ip, #134217728  ; 0x8000000
+    8074:   e59f1024    ldr r1, [pc, #36]   ; 80a0 <int_vector+0x40>
+    8078:   e59f0024    ldr r0, [pc, #36]   ; 80a4 <int_vector+0x44>
+    807c:   e5914034    ldr r4, [r1, #52]   ; 0x34
+    8080:   e5903000    ldr r3, [r0]
+    8084:   e583e004    str lr, [r3, #4]
+    8088:   e283e008    add lr, r3, #8
+    808c:   e5834000    str r4, [r3]
+    8090:   e580e000    str lr, [r0]
+    8094:   e581c040    str ip, [r1, #64]   ; 0x40
+    8098:   ee072fba    mcr 15, 0, r2, cr7, cr10, {5}
+    809c:   e8bd8010    pop {r4, pc}
+    80a0:   20200000    .word   0x20200000
+    80a4:   0000997c    .word   0x0000997c
+```
+
+This removes about 150 cycles.
+
+```
+0: rising   = 1241 total cycles [419 until int ran]
+1: falling  = 1040 total cycles [342 until int ran]
+2: rising   = 1038 total cycles [343 until int ran]
+3: falling  = 1047 total cycles [342 until int ran]
+4: rising   = 1044 total cycles [343 until int ran]
+5: falling  = 1038 total cycles [342 until int ran]
+6: rising   = 1045 total cycles [343 until int ran]
+7: falling  = 1040 total cycles [342 until int ran]
+8: rising   = 1035 total cycles [340 until int ran]
+9: falling  = 1040 total cycles [342 until int ran]
+10: rising  = 1038 total cycles [343 until int ran]
+11: falling = 1035 total cycles [342 until int ran]
+12: rising  = 1038 total cycles [343 until int ran]
+13: falling = 1040 total cycles [342 until int ran]
+14: rising  = 1035 total cycles [340 until int ran]
+15: falling = 1040 total cycles [343 until int ran]
+16: rising  = 1035 total cycles [340 until int ran]
+17: falling = 1040 total cycles [342 until int ran]
+18: rising  = 1041 total cycles [343 until int ran]
+19: falling = 1046 total cycles [342 until int ran]
+ave cost = 1049.800048
+```
+
+
+
+----------------------------------------------------------------------
+### Step 4:  fix let performance bug
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+NOTE: 
+  -Iif you see this do a pull for more README updates (possibly by weekend :/)
