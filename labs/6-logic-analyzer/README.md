@@ -507,15 +507,216 @@ ave cost = 1049.800048
 
 
 ----------------------------------------------------------------------
-### Step 4:  fix let performance bug
+### Step 4: [NEW] fix let performance bug
 
 
 
+Our test routine `test_cost` has a big impact on our performance.
+However, unlike the interrupt handler big enough it's really hard to
+look at the machine code and figure out what is going on.  So we do a
+trick I often use --- "outline" the most crucial part so we can look at
+it in isolation:
 
 
+```
+uint32_t measure_fn(void) {
+    let r = read_cur();
+    asm volatile(".align 5");
+    let s = cycle_cnt_read();
+    gpio_set_on_raw(out_pin);
+    while(r == read_cur())
+        ;
+    let e = cycle_cnt_read();
+    return e-s;
+}
+```
+
+One concerning thing is that the loop  in the extracted code maps to
+the following, which has two loads(?!).  The variable `r` should be in
+a local register, what is going on?
+```
+    ...
+    83d0:   e5913000    ldr r3, [r1]
+    83d4:   e59d2004    ldr r2, [sp, #4]
+    83d8:   e1520003    cmp r2, r3
+    83dc:   0afffffb    beq 83d0 <measure_fn+0x28>
+    ...
+```
+
+So, it turns out the culprit is our use of `let` which expands to
+`__auto_type__` which causes gcc to declare `r` to be the same type as
+the right hand side `read_cur()`.  Unfortunately `read_cur` returns a
+`volatile` pointer --- a pointer that can change at any point --- so
+the local is also `volatile` pointer.  Major performance bug.
+
+We now change `let` to be of type `timed_read_t *`.
+
+It's not uncommon for code to have stupid performance bugs --- since they
+won't crash the code directly but just slow it down, it's common to miss them.
+Looking at machine code after making it manageable let us get it.  I would
+have fixed it before lab, but this is actually a useful teaching point.
+(Sorry.)
+
+Checking our loop, the load got removed:
+```
+    8390:   e5923000    ldr r3, [r2]
+    8394:   e1510003    cmp r1, r3
+    8398:   0afffffc    beq 8390 <measure_fn+0x34>
+```
+
+The result: almost exactly 100 cycles saved --- mostly because it gets
+rid of a data cache miss.
+
+```
+0: rising   = 1125 total cycles [362 until int ran]
+1: falling  = 938 total cycles [292 until int ran]
+2: rising   = 929 total cycles [295 until int ran]
+3: falling  = 944 total cycles [295 until int ran]
+4: rising   = 944 total cycles [295 until int ran]
+5: falling  = 927 total cycles [296 until int ran]
+6: rising   = 929 total cycles [295 until int ran]
+7: falling  = 938 total cycles [292 until int ran]
+8: rising   = 927 total cycles [296 until int ran]
+9: falling  = 938 total cycles [292 until int ran]
+10: rising  = 927 total cycles [296 until int ran]
+11: falling = 930 total cycles [296 until int ran]
+12: rising  = 944 total cycles [295 until int ran]
+13: falling = 932 total cycles [295 until int ran]
+14: rising  = 927 total cycles [296 until int ran]
+15: falling = 932 total cycles [295 until int ran]
+16: rising  = 926 total cycles [295 until int ran]
+17: falling = 941 total cycles [295 until int ran]
+18: rising  = 947 total cycles [296 until int ran]
+19: falling = 929 total cycles [295 until int ran]
+ave cost = 943.700012
+```
+
+----------------------------------------------------------------------
+### Step 5:  gcc's `IRQ` attribute
+
+We now do a new trick we didn't use in lab 1.
+
+One big wasteful thing we do is use the trampoline in `interrupt-asm.S`
+that (1) sets the stack pointer, (2) saves registers, (3) jumps to our
+C code (4) then restores registers and then jumps to the interrupted code.
+
+Ideally we could:
+  1. Get rid of this jump (wasteful, pipeline bubble, potential icache issue)
+  2. Only save and restore *exactly* those registers used by the C handler.
+
+The `arm-none-eabi-gcc` compiler we use provides attributes for the
+different ARM interrupt handlers.  If you use it, it will
+  1. Save all the caller registers (since they are live)
+  2. Return using a `movs` with the right offset for the `lr`.
+
+To use it, we declare `int_vector` as:
+
+```
+    __attribute__((interrupt("IRQ"), aligned(32)))
+    void int_vector(void) {
+            ...
+    }
+```
+
+And change the interrupt assembly code to just branch directly to
+`int_vector`:
+
+```
+.align 5;
+.globl default_vec_ints
+default_vec_ints:
+    b reset
+    b undef
+    b syscall
+    b prefetch_abort
+    b data_abort
+    b reset
+    b int_vector
+```
+
+Finally, we also have to pre-initialize the IRQ stack pointer since we
+won't be setting it up each time. We steal the pattern from lab 1 that
+we used to initialize the FIQ registers:
 
 
+```
+MK_FN(interrupt_setup_stack)
+    @ switch to IRQ mode
+    CPS #IRQ_MODE
+    prefetch_flush(r3);
 
+    @ set the IRQ stack
+    mov sp, #INT_STACK
+
+    @ switch back to super mode.
+    CPS #SUPER_MODE
+    prefetch_flush(r3);
+    bx lr
+```
+We call this before enabling interrupts in `notmain`.
+
+Note:
+  - We could have made the interrupt trampoline more efficient since
+    we save and restore more registers than we need and also always
+    load the stack pointer.  The current IRQ optimization leaps right
+    over it.
+
+If you examine the machine code, you can see that it:
+  1. corrects the exception pc held in lr by 4 (8060).
+  2. Uses the supervisor restoration of pc using the `^` operator,
+     which copies the spsr to the cpsr (80a4).
+
+
+```
+00008060 <int_vector>:
+    8060:   e24ee004    sub lr, lr, #4
+    8064:   e92d501f    push    {r0, r1, r2, r3, r4, ip, lr}
+    8068:   ee1f4f3c    mrc 15, 0, r4, cr15, cr12, {1}
+    806c:   e3a03000    mov r3, #0
+    8070:   ee073fba    mcr 15, 0, r3, cr7, cr10, {5}
+    8074:   e59f002c    ldr r0, [pc, #44]   ; 80a8 <int_vector+0x48>
+    8078:   e59f102c    ldr r1, [pc, #44]   ; 80ac <int_vector+0x4c>
+    807c:   e591e034    ldr lr, [r1, #52]   ; 0x34
+    8080:   e5902000    ldr r2, [r0]
+    8084:   e282c008    add ip, r2, #8
+    8088:   e5824004    str r4, [r2, #4]
+    808c:   e582e000    str lr, [r2]
+    8090:   e580c000    str ip, [r0]
+    8094:   ee073fba    mcr 15, 0, r3, cr7, cr10, {5}
+    8098:   e3a02302    mov r2, #134217728  ; 0x8000000
+    809c:   e5812040    str r2, [r1, #64]   ; 0x40
+    80a0:   ee073fba    mcr 15, 0, r3, cr7, cr10, {5}
+    80a4:   e8fd901f    ldm sp!, {r0, r1, r2, r3, r4, ip, pc}^
+    80a8:   0000997c    .word   0x0000997c
+    80ac:   20200000    .word   0x20200000
+```
+
+This simple change made over 200 cycles difference!  Very cool.
+
+
+```
+0: rising   = 874 total cycles [312 until int ran]
+1: falling  = 736 total cycles [228 until int ran]
+2: rising   = 742 total cycles [234 until int ran]
+3: falling  = 736 total cycles [228 until int ran]
+4: rising   = 739 total cycles [230 until int ran]
+5: falling  = 736 total cycles [227 until int ran]
+6: rising   = 745 total cycles [234 until int ran]
+7: falling  = 736 total cycles [228 until int ran]
+8: rising   = 736 total cycles [230 until int ran]
+9: falling  = 739 total cycles [228 until int ran]
+10: rising  = 745 total cycles [234 until int ran]
+11: falling = 736 total cycles [227 until int ran]
+12: rising  = 742 total cycles [233 until int ran]
+13: falling = 739 total cycles [228 until int ran]
+14: rising  = 745 total cycles [234 until int ran]
+15: falling = 734 total cycles [228 until int ran]
+16: rising  = 748 total cycles [234 until int ran]
+17: falling = 739 total cycles [228 until int ran]
+18: rising  = 742 total cycles [234 until int ran]
+19: falling = 736 total cycles [227 until int ran]
+ave cost = 746.250000
+```
 
 
 
