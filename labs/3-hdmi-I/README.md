@@ -206,3 +206,7 @@ Some bigger ideas:
   - Write your own window manager for your pi.  
 
 This is a tiny set of possibles --- lmk if you come up w/ other cute ones.
+
+
+Low level videocore video!
+   - [video](https://www.youtube.com/watch?v=hSJWbmiQfck)
