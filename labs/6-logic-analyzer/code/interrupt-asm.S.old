@@ -1,0 +1,75 @@
+#include "rpi-asm.h"
+
+@ just use the default libpi interrupt stack address.
+#define INT_STACK INT_STACK_ADDR
+
+#define in_pin 27
+
+.align 5; 
+.globl default_vec_ints
+default_vec_ints: 
+    @ see below: these jump to default libpi handlers and panic.
+    b reset             @ 1
+    b undef             @ 2
+    b syscall           @ 3
+    b prefetch_abort    @ 4
+    b data_abort        @ 5
+    b reset             @ 6
+    b interrupt_trampoline
+
+interrupt_trampoline:
+    @ sleazy: we just fall through for interrupt handler.
+        mrc p15, 0, sp, c15, c12, 1      @ read cycle counter
+        mcr p15, 0, sp, c13, c0, 4     @ move it into scratch reg
+
+        sub   lr, lr, #4               @ correct interrupt pc
+        mov sp, #INT_STACK             @ load the stack pointer
+        push  {r0-r4,r12,lr}              @ push all regs (trim this to caller)
+        mrc p15, 0, r0, c13, c0, 4     @ pass cycle counter are arg1
+        bl    int_vector               @ call our interrupt handler.
+        pop   {r0-r4,r12,lr}              @ pop all the regs
+        movs    pc, lr                 @ resume back at exception location.
+
+
+        mov sp, #INT_STACK             @ load the stack pointer
+        push  {r2,r3}
+
+        @ set the flag
+        mov r3, #1
+        mcr 15, 0, r3, cr13, cr0, 3
+
+        @ get the event address
+        mrc 15, 0, r3, cr13, cr0, 2
+        mov r2, #(1<<in_pin)
+        str r2, [r3]
+
+        pop  {r2,r3}
+
+        @ correct interrupt pc and
+        @ resume back at exception location.
+        subs   pc, lr, #4               
+
+
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@ these are trampolines for unexpected exceptions: they just
+@ die with an error.  you don't have to modify them.
+
+#define MK_TRAMPOLINE(name, offset, fn)         \
+    name:                                       \
+        sub   lr, lr, # (offset);               \
+        mov sp, #INT_STACK;               \
+        push  {r0-r12,lr};                \
+        mov   r0, lr;                     \
+        bl    fn;                         \
+        pop   {r0-r12,lr};                \
+        movs    pc, lr
+
+
+@ call the default libpi handlers, which panic with an error 
+@ message.  override if you want to do something fancier.
+MK_TRAMPOLINE(reset,            4, reset_vector)
+MK_TRAMPOLINE(undef,            4, undefined_instruction_vector)
+MK_TRAMPOLINE(prefetch_abort,   4, prefetch_abort_vector)
+MK_TRAMPOLINE(data_abort,       8, data_abort_vector)
+MK_TRAMPOLINE(syscall,          4, syscall_vector)
