@@ -601,16 +601,23 @@ that (1) sets the stack pointer, (2) saves registers, (3) jumps to our
 C code (4) then restores registers and then jumps to the interrupted code.
 
 Ideally we could:
-  1. Get rid of this jump (wasteful, pipeline bubble, potential icache issue)
-  2. Only save and restore *exactly* those registers used by the C handler.
+  1. Get rid of the jump to and from the C handler (wasteful, 
+     pipeline bubble, potential icache issue)
+  2. Only save and restore *exactly* those registers used by the
+     C handler.  It's short (and will be shorter) so there's some chance
+     it doesn't use all ARM registers.
+
+And it turns out we can, and without much work!
 
 The `arm-none-eabi-gcc` compiler we use provides attributes for the
 different ARM interrupt handlers.  If you use it, it will
   1. Save all the caller registers (since they are live)
   2. Return using a `movs` with the right offset for the `lr`.
 
-To use it, we declare `int_vector` as:
+As a result we don't need to use the interrupt trampoline, at least as
+long as we setup the stack pointer before hand.
 
+To use the `IRQ` attribute, we declare `int_vector` as:
 ```
     __attribute__((interrupt("IRQ"), aligned(32)))
     void int_vector(void) {
@@ -637,8 +644,6 @@ default_vec_ints:
 Finally, we also have to pre-initialize the IRQ stack pointer since we
 won't be setting it up each time. We steal the pattern from lab 1 that
 we used to initialize the FIQ registers:
-
-
 ```
 MK_FN(interrupt_setup_stack)
     @ switch to IRQ mode
@@ -653,7 +658,7 @@ MK_FN(interrupt_setup_stack)
     prefetch_flush(r3);
     bx lr
 ```
-We call this before enabling interrupts in `notmain`.
+We call this routine before enabling interrupts in `notmain`.
 
 Note:
   - We could have made the interrupt trampoline more efficient since
@@ -661,11 +666,11 @@ Note:
     load the stack pointer.  The current IRQ optimization leaps right
     over it.
 
-If you examine the machine code, you can see that it:
-  1. corrects the exception pc held in lr by 4 (8060).
+If you examine the machine code, you can see that the gcc-emitted
+code:
+  1. Correctly handles the exception pc held in lr by 4 (8060).
   2. Uses the supervisor restoration of pc using the `^` operator,
      which copies the spsr to the cpsr (80a4).
-
 
 ```
 00008060 <int_vector>:
@@ -692,8 +697,6 @@ If you examine the machine code, you can see that it:
 ```
 
 This simple change made over 200 cycles difference!  Very cool.
-
-
 ```
 0: rising   = 874 total cycles [312 until int ran]
 1: falling  = 736 total cycles [228 until int ran]
@@ -718,12 +721,271 @@ This simple change made over 200 cycles difference!  Very cool.
 ave cost = 746.250000
 ```
 
+----------------------------------------------------------------------
+### Step 6:  use global registers
+
+If you look at the machine code above, you can multiple loads of constants
+--- some because they are large and don't fit, some because they are
+link time addresses and the compiler assumes the worst case that they
+can't be loaded with one instruction.
+
+As we saw in lab 1, we can get rid of these either by preloading
+them into global registers or by switching to FIQ mode and preloading
+into its shadow registers.
+
+Since it requires fewer changes, we'll first try using global registers.
+
+For a more complete explanation, look at lab 1.  For a cursory explanation,
+you are in the right place!
+
+First, the lowest effort way is to use the `cp_asm_raw` macro to
+generate wrapper routines:
+
+```
+#include "asm-helpers.h"
+cp_asm_raw(cp15_scratch3, p15, 0, c13, c0, 4)
+cp_asm_raw(cp15_scratch2, p15, 0, c13, c0, 3)
+cp_asm_raw(cp15_scratch1, p15, 0, c13, c0, 2)
+```
+
+These invocations will use the preprocessor to generate six
+routines, two for each invocation:
+`cp15_scratch3_set_raw` (no prefetch flush),
+`cp15_scratch3_get`,
+`cp15_scratch2_set_raw` (no prefetch flush)
+`cp15_scratch2_get`,
+`cp15_scratch1_set_raw` (no prefetch flush)
+`cp15_scratch1_get`.
 
 
+Now for type checking, we make some wrappers with more mnemonic names.
+    - NOTE: It'd be better to make your own version of the macro that
+      takes a return/argument type so you don't have to do the next step
+      of writing wrappers.
+
+```
+static inline timed_read_t * tr_get(void)
+    { return (void*)cp15_scratch1_get(); }
+static inline void tr_set(timed_read_t *t)
+    { cp15_scratch1_set_raw((uint32_t)t); }
+
+static inline volatile uint32_t *event0_get(void)
+    { return (void*)cp15_scratch2_get(); }
+static inline void event0_set(uint32_t event0)
+    { cp15_scratch2_set_raw(event0); }
+
+static inline volatile uint32_t *level0_get(void)
+    { return (void*)cp15_scratch3_get(); }
+static inline void level0_set(uint32_t level0)
+    { cp15_scratch3_set_raw(level0); }
+```
 
 
+Now, during initialization set them up:
+```
+static void int_init(void) {
+    tr_set(tr = &t_reads[0]);
+
+    level0_set(GPIO_LEV0);
+    event0_set(GPIO_EVENT_DETECT0);
+}
+```
+
+And change the interrupt handler to use them:
+```
+__attribute__((interrupt("IRQ"), aligned(32)))
+void int_vector(void) {
+    uint32_t cycle = cycle_cnt_read();
+
+    // we don't know what the user code was doing
+    dmb_raw();
+    uint32_t lev = *level0_get();
+
+    let tr = tr_get();
+    *tr =  (timed_read_t) { .cyc = cycle, .lev = lev };
+    tr_set(tr+1);
+
+    assert(tr < t_end);
+
+    // gpio and event clear may need device barrier?
+    dmb_raw();
+
+    *event0_get() = 1 << in_pin;
+
+    // we don't know what the user code was doing
+    dmb_raw();
+}
+```
 
 
+Finally, change the `test_cost` driver to use the new name `tr_get()`
+(or, better, just keep the old one).
+
+The result is great!  Over 300 cycles saved (about 40%):
+```
+0: rising   = 581 total cycles [298 until int ran]
+1: falling  = 440 total cycles [214 until int ran]
+2: rising   = 446 total cycles [219 until int ran]
+3: falling  = 460 total cycles [220 until int ran]
+4: rising   = 446 total cycles [219 until int ran]
+5: falling  = 445 total cycles [219 until int ran]
+6: rising   = 446 total cycles [219 until int ran]
+7: falling  = 459 total cycles [219 until int ran]
+8: rising   = 451 total cycles [225 until int ran]
+9: falling  = 445 total cycles [219 until int ran]
+10: rising  = 451 total cycles [225 until int ran]
+11: falling = 460 total cycles [219 until int ran]
+12: rising  = 446 total cycles [219 until int ran]
+13: falling = 445 total cycles [219 until int ran]
+14: rising  = 446 total cycles [219 until int ran]
+15: falling = 463 total cycles [223 until int ran]
+16: rising  = 451 total cycles [225 until int ran]
+17: falling = 446 total cycles [219 until int ran]
+18: rising  = 451 total cycles [225 until int ran]
+19: falling = 460 total cycles [219 until int ran]
+ave cost = 456.899993
+```
+
+
+----------------------------------------------------------------------
+####  step 7:  use FIQ
+
+If you look at the interrupt vector:
+
+```
+00008060 <int_vector>:
+    8060:   e92d000f    push    {r0, r1, r2, r3}
+    8064:   ee1f1f3c    mrc 15, 0, r1, cr15, cr12, {1}
+    8068:   e3a02000    mov r2, #0
+    806c:   ee072fba    mcr 15, 0, r2, cr7, cr10, {5}
+    8070:   ee1d3f90    mrc 15, 0, r3, cr13, cr0, {4}
+    8074:   e5930000    ldr r0, [r3]
+    8078:   ee1d3f50    mrc 15, 0, r3, cr13, cr0, {2}
+    807c:   e8830003    stm r3, {r0, r1}
+    8080:   e2833008    add r3, r3, #8
+    8084:   ee0d3f50    mcr 15, 0, r3, cr13, cr0, {2}
+    8088:   ee072fba    mcr 15, 0, r2, cr7, cr10, {5}
+    808c:   ee1d3f70    mrc 15, 0, r3, cr13, cr0, {3}
+    8090:   e3a01302    mov r1, #134217728  ; 0x8000000
+    8094:   e5831000    str r1, [r3]
+    8098:   ee072fba    mcr 15, 0, r2, cr7, cr10, {5}
+    809c:   e8bd000f    pop {r0, r1, r2, r3}
+    80a0:   e25ef004    subs    pc, lr, #4
+```
+
+You can see there's still a bunch of redundant operations to:
+  1. Save (8060) and restore (809c) registers used during
+     the routine.
+  2. Moving global registers to general purpose registers
+     in order to do computation (8070, 8078, 808c).
+  3. Then moving the general register back to global
+     registers (8084).
+
+As with lab 1, we can eliminate all of these by:
+  1. Getting more scratch registers by setting up the
+     GPIO interrupt to be switched to FIQ mode, which
+     has additional shadow registers r8-r12.
+  2. Rewriting in assembly to use them, thoroughly.
+
+
+In order to make the change easier, we do it in two steps, first switching
+to FIQ and making sure the code still works, and then in the next step
+rewriting in assembly.
+
+Switching to FIQ requires the following four steps:
+
+  1.  Change the `IRQ` annotation to `FIQ` and rename the routine
+      for clarity:
+```
+__attribute__((interrupt("FIQ"), aligned(32)))
+void fiq_handler(void) {
+```
+
+  2. As in lab 1 switch the GPIO interrupt routines from:
+```
+    // setup interrupts on both rising and falling edges.
+    gpio_int_rising_edge(in_pin);
+    gpio_int_falling_edge(in_pin);
+```
+
+To FIQ routines:
+```
+    // setup interrupts on both rising and falling edges.
+    gpio_fiq_rising_edge(in_pin);
+    gpio_fiq_falling_edge(in_pin);
+```
+  3. Change our stack setup for FIQ:
+
+```
+MK_FN(fiq_setup_stack)
+    @ switch to IRQ mode
+    CPS #FIQ_MODE
+    prefetch_flush(r3);
+
+    @ set the IRQ stack
+    mov sp, #INT_STACK
+
+    @ switch back to super mode.
+    CPS #SUPER_MODE
+    prefetch_flush(r3);
+    bx lr
+```
+
+  4.  And finally modify the interrupt table:
+```
+.align 5;
+.globl default_vec_ints
+default_vec_ints:
+    b reset
+    b undef
+    b syscall
+    b prefetch_abort
+    b data_abort
+    b reset
+    b unhandled_interrupt  @ defined in libpi
+    b fiq_handler
+    asm_not_reached();
+```
+
+After these changes, my code still works and gets roughly the
+same results:
+```
+0: rising   = 576 total cycles [295 until int ran]
+1: falling  = 446 total cycles [219 until int ran]
+2: rising   = 460 total cycles [219 until int ran]
+3: falling  = 445 total cycles [219 until int ran]
+4: rising   = 446 total cycles [219 until int ran]
+5: falling  = 445 total cycles [219 until int ran]
+6: rising   = 460 total cycles [219 until int ran]
+7: falling  = 446 total cycles [220 until int ran]
+8: rising   = 445 total cycles [219 until int ran]
+9: falling  = 445 total cycles [219 until int ran]
+10: rising  = 460 total cycles [219 until int ran]
+11: falling = 445 total cycles [219 until int ran]
+12: rising  = 446 total cycles [219 until int ran]
+13: falling = 445 total cycles [219 until int ran]
+14: rising  = 460 total cycles [219 until int ran]
+15: falling = 451 total cycles [225 until int ran]
+16: rising  = 446 total cycles [219 until int ran]
+17: falling = 445 total cycles [219 until int ran]
+18: rising  = 460 total cycles [219 until int ran]
+19: falling = 445 total cycles [219 until int ran]
+ave cost = 455.850006
+```
+
+
+NOTE:
+  - I also tried fussing around with making local variables
+    FIQ registers, but couldn't get any speedup.  For example:
+```
+    register uint32_t cycle asm("r9") = cycle_cnt_read();
+    dmb_raw();
+    register uint32_t lev asm("r10") = gpio_read_all();
+```
+  - I didn't try much so perhaps was missing something.
+
+----------------------------------------------------------------------
+### Step 8:  write it in assembly.
 
 
 
