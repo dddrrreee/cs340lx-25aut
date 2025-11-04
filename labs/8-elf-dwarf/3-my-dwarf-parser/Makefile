@@ -51,7 +51,7 @@ $(TARGET): $(OBJS)
 	$(OBJDUMP) -d $(TARGET).elf > $(TARGET).list
 
 # Pattern rule for compiling C source files to object files
-$(OBJDIR)/%.o: %.c
+$(OBJDIR)/%.o: %.c FORCE
 	@mkdir -p $(OBJDIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 #   Uncomment to see the object file ELF, disassembly, and hexdump
@@ -60,7 +60,7 @@ $(OBJDIR)/%.o: %.c
 #   $(HEXDUMP) -C $@ > $@.hexdump
 
 # Pattern rule for compiling assembly source files to object files
-$(OBJDIR)/%.o: %.S
+$(OBJDIR)/%.o: %.S FORCE
 	@mkdir -p $(OBJDIR)
 	$(CC) $(ASFLAGS) $(INCLUDES) -c $< -o $@
 #   Uncomment to see the object file ELF, disassembly, and hexdump
@@ -72,4 +72,5 @@ $(OBJDIR)/%.o: %.S
 clean:
 	rm -rf $(OBJDIR) $(TARGET) $(TARGET).elf $(TARGET).hexdump $(TARGET).list $(TARGET).readelf $(TARGET).bin
 
-.PHONY: all clean
+.PHONY: all clean FORCE
+FORCE:
