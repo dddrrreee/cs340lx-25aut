@@ -93,11 +93,19 @@ Pages 92–104 of the DWARF 3 specification (6.2. Line Number Information) descr
 
 The primary purpose of the `.debug_line` section is to provide a mapping between machine instruction addresses in the executable and their corresponding source file names and line numbers. With this mapping, a debugger can display source locations, implement source-level stepping, set breakpoints, and perform many other tasks.
 
-If memory usage were NOT a concern, providing this mapping would be trivial: a massive matrix with one row per machine instruction and columns for the source file name, line number, column number, and any other metadata needed. However, such a table would be impractically large.
+If memory usage were NOT a concern, providing this mapping would be trivial: a massive matrix with one row per machine instruction and columns for the source file name, line number, column number, and any other metadata needed. However, such a table, as shown in the below figure, would be impractically large.
 
-To solve this, the `.debug_line` section encodes the mapping as a hypothetical state machine driven by a set of predefined instructions. When interpreted, these instructions reconstruct the "line number matrix" described in the previous paragraph. In other words, parsing the `.debug_line` section means implementing an interpreter for this state machine according to the DWARF specification, executing its instruction stream to rebuild the full mapping from addresses to source files and lines.
+![line number matrix](./images/line-number-matrix.png)
 
-In practice, the `.debug_line` section is a binary blob like any other ELF section. It consists of N contiguous sub-blobs, where N is the number of compilation units (i.e., the number of source files). Each sub-blob is called a **line number program**, defined by the specification as “a series of byte-coded line number information instructions representing one compilation unit.” By interpreting one line number program, you can reconstruct the line number matrix for a single source file. Processing all of them gives you the complete mapping for the entire binary.
+To solve this, the `.debug_line` section encodes the mapping as a hypothetical state machine driven by a set of predefined instructions. When interpreted, these instructions reconstruct the "line number matrix" described in the previous paragraph. In other words, parsing the `.debug_line` section means implementing an interpreter for this state machine according to the DWARF specification, executing its instruction stream to rebuild the full mapping from addresses to source files and lines. This is depicted in the figure below:
+
+![line number program](./images/line-number-program.png)
+
+In practice, the `.debug_line` section is a binary blob like any other ELF section. It consists of N contiguous sub-blobs, where N is the number of compilation units (i.e., the number of source files). Each sub-blob is called a **line number program**, defined by the specification as “a series of byte-coded line number information instructions representing one compilation unit.” This is illustrated in the figure below:
+
+![.debug_line format](./images/debug-line-format.png)
+
+By interpreting one line number program, you can reconstruct the line number matrix for a single source file. Processing all of them gives you the complete mapping for the entire binary.
 
 Each line number program has two parts: a **header** and a **sequence of instructions**.  
 - The **header** contains metadata such as the program length, DWARF version, file name strings, and predefined constants that help compress repeated data.
