@@ -81,7 +81,7 @@ int64_t read_sleb128(uint8_t **data) {
         // byte = *ptr++;
         // result = ?;
         // shift += ?;
-        if ((byte & 0x80) == 0) break;
+        // if ((byte & 0x80) == 0) break;
     }
 
     // Sign-extend if negative
