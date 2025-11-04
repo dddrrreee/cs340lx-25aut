@@ -58,6 +58,10 @@ uint64_t read_uleb128(uint8_t **data) {
     while (1) {
         // Parse each byte in the ULEB128 encoding
         todo("Parse each byte in the ULEB128 encoding");
+        // uint8_t byte = *ptr++;
+        // result = ?
+        // if ((byte & 0x80) == 0) break;
+        // shift += ?;
     }
     *data = ptr;
     return result;
@@ -74,12 +78,16 @@ int64_t read_sleb128(uint8_t **data) {
     while (1) {
         // Parse each byte in the SLEB128 encoding
         todo("Parse each byte in the SLEB128 encoding");
+        // byte = *ptr++;
+        // result = ?;
+        // shift += ?;
+        if ((byte & 0x80) == 0) break;
     }
 
     // Sign-extend if negative
     todo("Sign-extend if negative");
     // if ((shift < 64) && (byte & 0x40)) {
-    //     result |= ??
+    //     result = ??
     // }
 
     *data = ptr;
@@ -91,17 +99,16 @@ int64_t read_sleb128(uint8_t **data) {
 static inline uint8_t *parse_line_program_header(my_dwarf_line_program_header *line_program_header, uint8_t **line_ptr) {
     // 1. unit_length
     // length for this compilation unit excluding the unit_length field itself
-    todo("Parse the unit length");
-    // line_program_header->unit_length = ??;
+    line_program_header->unit_length = read_u32(*line_ptr); 
+    *line_ptr += 4; // read_u32 does not advance the pointer
 
     // for advancing to the next unit (must exclude the unit_length field itself)
-    todo("Retrieve the end pointer");
-    // uint8_t *end_ptr = ??;
+    uint8_t *end_ptr = *line_ptr + line_program_header->unit_length; 
 
     // 2. version. 
     // Should be 3 for our case
     todo("Parse the version");
-    // line_program_header->version = ??;
+    // line_program_header->version = ??; // remember to advance the pointer!
     assert(line_program_header->version == DEBUG_LINE_DWARF_VERSION);
 
     // 3. header_length
@@ -131,9 +138,8 @@ static inline uint8_t *parse_line_program_header(my_dwarf_line_program_header *l
     assert(10 <= line_program_header->opcode_base && line_program_header->opcode_base <= 32);
 
     // 9. standard_opcode_lengths
-    todo("Parse the standard opcode lengths");
-    // for (int i = 1; i < line_program_header->opcode_base; i++)
-    //     line_program_header->standard_opcode_lengths[i - 1] = ??;
+    for (int i = 1; i < line_program_header->opcode_base; i++)
+        line_program_header->standard_opcode_lengths[i - 1] = *(*line_ptr)++;
 
     // 10. include_directories
     // Instead of copying the entire string, we just save the pointer to the string
@@ -142,8 +148,8 @@ static inline uint8_t *parse_line_program_header(my_dwarf_line_program_header *l
             panic("Include directory table overflow");
         if (strlen((char *)*line_ptr) == 0)
             break;
-        todo("Save the include directory pointer");
-        // line_program_header->include_dirs[i] = ??;
+        line_program_header->include_dirs[i] = (char *)*line_ptr;
+        *line_ptr += strlen(line_program_header->include_dirs[i]) + 1; // +1 for the null terminator
     }
     *line_ptr += 1; // for the last null terminator
 
@@ -154,7 +160,7 @@ static inline uint8_t *parse_line_program_header(my_dwarf_line_program_header *l
             panic("File table overflow");
         if (strlen((char *)*line_ptr) == 0) 
             break;
-        todo("Save the file name pointer");
+        todo("Save the file name string pointer");
         // line_program_header->file_table[i] = ??;
 
         // file name index in the include directories
