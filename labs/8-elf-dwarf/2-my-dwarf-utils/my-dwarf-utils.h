@@ -172,8 +172,7 @@ static inline uint8_t *parse_line_program_header(my_dwarf_line_program_header *l
     *line_ptr += 1; // for the last null terminator
 
     // Return the pointer to the end of the compilation unit
-    // return end_ptr;
-    return NULL;
+    return end_ptr;
 }
 
 // Initialize the line state machine
