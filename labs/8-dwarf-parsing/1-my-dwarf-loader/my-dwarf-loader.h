@@ -47,12 +47,19 @@ static void inline dwarf_sections_init(elf32_header *e_header, my_dwarf_sections
 
     // Initialize the elf32_dwarf_sections struct
     dwarf_sections->debug_info = NULL;
+    dwarf_sections->debug_info_end = NULL;
     dwarf_sections->debug_abbrev = NULL;
+    dwarf_sections->debug_abbrev_end = NULL;
     dwarf_sections->debug_aranges = NULL;
+    dwarf_sections->debug_aranges_end = NULL;
     dwarf_sections->debug_line = NULL;
+    dwarf_sections->debug_line_end = NULL;
     dwarf_sections->debug_str = NULL;
+    dwarf_sections->debug_str_end = NULL;
     dwarf_sections->debug_frame = NULL;
+    dwarf_sections->debug_frame_end = NULL;
     dwarf_sections->debug_loc = NULL;
+    dwarf_sections->debug_loc_end = NULL;
 
     // Iterate through the section header table and search for debugger-related sections
     for (int i = 0; i < e_header->e_shnum; i++) {
