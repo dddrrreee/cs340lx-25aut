@@ -71,3 +71,5 @@ $(OBJDIR)/%.o: %.S
 # Clean up generated files
 clean:
 	rm -rf $(OBJDIR) $(TARGET) $(TARGET).elf $(TARGET).hexdump $(TARGET).list $(TARGET).readelf $(TARGET).bin
+
+.PHONY: all clean
