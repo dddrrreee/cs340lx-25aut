@@ -100,9 +100,9 @@ static void inline parse_debug_line(my_dwarf_line_entry *addr_table, my_dwarf_se
                 todo("Apply all the changes required by special opcodes");
                 // line_state.address += ??;
                 // line_state.line += ??;
-                // line_state.basic_block = ??;
-                // line_state.prologue_end = ??;
-                // line_state.epilogue_begin = ??;
+                line_state.basic_block = 0; // false
+                line_state.prologue_end = 0; // false
+                line_state.epilogue_begin = 0; // false
 
                 // Finally, page 98 states that we should append a row to the line number matrix. So let's do that.
                 todo("Append a row to the line number matrix");
@@ -186,22 +186,19 @@ static void inline parse_debug_line(my_dwarf_line_entry *addr_table, my_dwarf_se
 
                     case DW_LNS_set_prologue_end: {
                         // Set the prologue_end field
-                        todo("Handle DW_LNS_set_prologue_end");
-                        // line_state.prologue_end = ??;
+                        line_state.prologue_end = 1; // already implemented for you :)
                         break;
                     }
 
                     case DW_LNS_set_epilogue_begin: {
                         // Set the epilogue_begin field
-                        todo("Handle DW_LNS_set_epilogue_begin");
-                        // line_state.epilogue_begin = ??;
+                        line_state.epilogue_begin = 1; // already implemented for you :)
                         break;
                     }
 
                     case DW_LNS_set_isa: {
                         // Read a single ULEB128 value and set it to the isa field
-                        todo("Handle DW_LNS_set_isa");
-                        // line_state.isa = ??;
+                        line_state.isa = read_uleb128(&ptr); // already implemented for you :)
                         break;
                     }
 
@@ -233,8 +230,8 @@ static void inline parse_debug_line(my_dwarf_line_entry *addr_table, my_dwarf_se
                         // Read a single uint32 (since our arch is 32b) and set it as the address
                         // Note: The spec says this is a relocatable address, but our executables are all 
                         //       statically linked, so this is the final runtime address
-                        todo("Handle DW_LNS_set_address");
-                        // line_state.address = ??;
+                        line_state.address = read_u32(ptr); // already implemented for you :)
+                        ptr += 4;
                         break;
                     }
 
