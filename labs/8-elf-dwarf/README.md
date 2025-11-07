@@ -158,10 +158,10 @@ However, we didn’t see any of the `.debug_*` sections back then. Why are they 
 ## Part 1: Load the DWARF Sections into Memory
 
 **Check-off:**
-- Fill in `dwarf_sections_init(...)` in `my-dwarf-loader.c`.
+- Fill in `dwarf_sections_init(...)` in `my-dwarf-loader.h`.
 - Run `notmain.c` and pass the checkoff.
 
-**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-loader.c`**
+**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-loader.h`**
 
 Now that all ELF executable files are on the SD card, it’s time to start reading them 😀 For today's lab, we’ll load only the `.debug_line` section into memory, since it’s the only DWARF section used in later parts of the lab. But you can easily modify the existing code to load other sections for your own use!
 
@@ -230,7 +230,7 @@ Now that we have a clear plan, let’s implement the DWARF loader. This should b
 - After loading the ELF executable at `0x0`, **extract the `.debug_line` section and place it in the heap**. This is your task inside `dwarf_sections_init(...)`.
 - Use the convenience struct `my_dwarf_sections` to store a pointer to the `.debug_line` section stored inside the heap.
 
-Refer to the comments in `my-dwarf-loader.c` for guidance and reference notes. The code is straightforward once you dive in. Start with `notmain.c` to understand the program structure first.
+Refer to the comments in `my-dwarf-loader.h` for guidance and reference notes. The code is straightforward once you dive in. Start with `notmain.c` to understand the program structure first.
 
 When you are done, running `make` should produce output similar to:
 
@@ -249,10 +249,10 @@ DONE!!!
 ## Part 2: Write Utility Functions for Parsing DWARF
 
 **Check-off:**
-- Fill in `read_uleb128(...)`, `read_sleb128(...)`, `parse_line_program_header(...)`, and `init_line_state(...)` in `my-dwarf-utils.c`.
+- Fill in `read_uleb128(...)`, `read_sleb128(...)`, `parse_line_program_header(...)`, and `init_line_state(...)` in `my-dwarf-utils.h`.
 - Run `notmain.c` and pass the checkoff.
 
-**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-utils.c`**
+**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-utils.h`**
 
 With the `.debug_line` section successfully copied into the heap, we are ready to parse them. While we could jump straight into parsing the `.debug_line` section, it is easier to build small parsing utilities first and test them in isolation.
 
@@ -294,10 +294,10 @@ DONE!!!
 ## Part 3: Parse the DWARF Line Number Program
 
 **Check-off:**
-- Fill in `parse_debug_line(...)` in `my-dwarf-parser.c`
+- Fill in `parse_debug_line(...)` in `my-dwarf-parser.h`
 - Run `notmain.c` and pass the checkoff
 
-**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-parser.c`**
+**TL;DR: Read through `notmain.c` to understand the program flow. Fill in the `todo`s in `my-dwarf-parser.h`**
 
 Now it’s time to implement the full line number program parser and drive the line number state machine ⚙️. At this point, the `.debug_line` section is safely loaded into the heap, we know how to read its data encodings, parse the line program header, and initialize the line program state machine. The only remaining step is to **interpret and execute the line program instructions**, which you will do in this part.
 
