@@ -114,17 +114,17 @@ Each line number program has two parts: a **header** and a **sequence of instruc
 ## Part 0: Compile the ELF Executable Files and Move Them to Your SD Card (3 min)
 
 **Check-off:**
-- Run `make` inside `0-my-libpi` and `1-my-tests`, in that order.  
-- Copy the resulting ELF files from `1-my-tests` to your SD card.  
+- Run `make` inside `0-my-libpi` and `0-my-tests`, in that order.  
+- Copy the resulting ELF files from `0-my-tests` to your SD card.  
 - Open the `*.elf.readelf` files and locate the debugging information sections.
 
 Just as in the previous ELF lab, it’s 😡😡😡 to repeatedly move files between your host machine and Pi. So we’ll move everything we need now, leaving the SD card in place for the rest of the lab.
 
 First, we want our ELF executable binaries to be consistent across environments for a smooth experience. Instead of relying on each person’s individual `libpi` directory, this lab provides a dedicated `0-my-libpi` directory that all later builds will depend on. Unlike in the previous ELF lab, we won’t create `libpi.so` or perform dynamic linking. Instead, we’ll generate a static library archive `libpi.a` for linking later. This step might seem unnecessary, but it helps avoid subtle issues caused by differences in individual setups. Go ahead and run `make` inside `0-my-libpi`. This should produce a `libpi.a` archive; no further action needed here.
 
-Second, `cd` into `1-my-tests`. This directory contains three programs that we’ll compile as full ELF executables, copy to the SD card, and later parse debugging information. We won’t actually run these programs in today’s lab (though that would be a great extension, and a necessary step to creating your own `gdb`). Instead, our DWARF parser will read these binaries directly from the FAT32 filesystem, parse their debugging sections, and extract metadata such as which machine instruction address corresponds to which line in the source code. Run `make` inside `1-my-tests`, then move all `*.elf` files (`test-0.elf`, `test-1.elf`, and `test-2.elf`) to your SD card. Before ejecting, run `sync` to ensure all data is properly written to disk.
+Second, `cd` into `0-my-tests`. This directory contains three programs that we’ll compile as full ELF executables, copy to the SD card, and later parse debugging information. We won’t actually run these programs in today’s lab (though that would be a great extension, and a necessary step to creating your own `gdb`). Instead, our DWARF parser will read these binaries directly from the FAT32 filesystem, parse their debugging sections, and extract metadata such as which machine instruction address corresponds to which line in the source code. Run `make` inside `0-my-tests`, then move all `*.elf` files (`test-0.elf`, `test-1.elf`, and `test-2.elf`) to your SD card. Before ejecting, run `sync` to ensure all data is properly written to disk.
 
-Finally, let's take a look at the sections we’ll be parsing today. After compiling inside `1-my-tests`, open one of the generated `*.elf.readelf` files in `1-my-tests`. These are the outputs of running the `readelf` tool on your ELF executables. For instance, `test-0.elf.readelf` should look something like this:
+Finally, let's take a look at the sections we’ll be parsing today. After compiling inside `0-my-tests`, open one of the generated `*.elf.readelf` files in `0-my-tests`. These are the outputs of running the `readelf` tool on your ELF executables. For instance, `test-0.elf.readelf` should look something like this:
 
 ```plaintext
 Section Headers:
