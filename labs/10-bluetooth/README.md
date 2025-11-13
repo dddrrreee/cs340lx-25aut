@@ -61,7 +61,7 @@ Right now, we have a full-duplex connection with the BT module through which we 
 First, the [UART transport layer section of the BT spec](./docs/BT%205.1%20H4%20UART.pdf) tells us how to identify each packet type:
 
 <p align="center">
-<img src="./images/H4 packet types.png" alt="Table from BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 4, Part A page 2528" width="800" />
+<img src="./images/H4 packet types.png" alt="Table from BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 4, Part A page 2528" width="600" />
 </p>
 
 To know how each packet type is laid out, let's take a look at the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
@@ -90,7 +90,7 @@ You should be able to pass `2-hci-reset.c`, executes an HCI_Reset command and wa
 ## Uploading the firmware patch
 
 <p align="center">
-<img src="./images/dory.jpg" alt="Pls don't hate me for this meme." width="800" />
+<img src="./images/dory.jpg" alt="Pls don't hate me for this meme." width="514" />
 </p>
 
 At this point, it is possible to communicate with the controller by sending it commands and receiving events.
