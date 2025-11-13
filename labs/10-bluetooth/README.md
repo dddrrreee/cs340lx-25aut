@@ -2,7 +2,9 @@
 
 **Lab by: [Javier Nieto](mailto:jgnieto@cs.stanford.edu)**
 
-![RPi Zero W image with Bluetooth logo](./images/rpi%20zero%20w%20bt.jpg)
+<p align="center">
+<img src="./images/rpi%20zero%20w%20bt.jpg" alt="RPi Zero W image with Bluetooth logo" width="800" />
+</p>
 
 ## Useful links
 
@@ -31,10 +33,9 @@ In this lab, you will use these commands to connect to a friend's Pi and send th
 
 ## 1. PL011 UART setup
 
-<!--<p align="center">
-  <img src="./images/UART0%20pins.png" width="600" />
-</p>-->
-![UART0 GPIOs](./images/UART0%20pins.png)
+<p align="center">
+<img src="./images/UART0 pins.png" alt="UART0 GPIOs" width="800" />
+</p>
 
 So far, we have been using the "mini UART" from the AUX device (`uart1`) for printk, whose register layout is based on the 16650 design. Since we also need a UART for the Bluetooth chip, we will use the `uart0` device which follows the ARM PL011 design.
 As you can see, pins 30-33 actually have both UARTs, `uart0` on GPIO function ALT3 and `uart1` on ALT5.
@@ -59,7 +60,9 @@ Let's start by sending an HCI_Reset command, which should always be the first co
 Right now, we have a full-duplex connection with the BT module through which we exchange streams of bytes, but there is no way of knowing when a new packet starts or what type it is.
 First, the [UART transport layer section of the BT spec](./docs/BT%205.1%20H4%20UART.pdf) tells us how to identify each packet type:
 
-![Table from BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 4, Part A page 2528](./images/H4%20packet%20types.png)
+<p align="center">
+<img src="./images/H4 packet types.png" alt="Table from BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 4, Part A page 2528" width="800" />
+</p>
 
 To know how each packet type is laid out, let's take a look at the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
 Here is the format for a command. Notice that the first two octets are the OpCode. In the spec, you can read
@@ -69,11 +72,15 @@ Next there is a one octet that specifies the total length of the parameters, in 
 Notice that this means that when we receive a packet, we need to wait until we have three octets to know how long it will be.
 **Important: everything is little endian, so if something is multiple bytes, send the least significant bytes first!!**
 
-![Command format - HCI pdf page 770](./images/HCI%20command%20format.png)
+<p align="center">
+<img src="./images/HCI command format.png" alt="Command format - HCI pdf page 770" width="800" />
+</p>
 
 And this is the format for an event. Notice that it is quite similar, with the only difference that the event code is one instead of two octets.
 
-![Event format - HCI pdf page 776](./images/HCI%20event%20format.png)
+<p align="center">
+<img src="./images/HCI event format.png" alt="Event format - HCI pdf page 776" width="800" />
+</p>
 
 Complete the TODO's in `bt.c` for the following functions: `bt_init`, `_receive_event`, and `bt_send_command`.
 You will notice that the function `_receive_packet` is called when the user of this module requests a packet synchronously (or asynchronously but there is pending data).
@@ -82,7 +89,9 @@ You should be able to pass `2-hci-reset.c`, executes an HCI_Reset command and wa
 
 ## Uploading the firmware patch
 
-![Pls don't hate me for this meme](./images/dory.jpg)
+<p align="center">
+<img src="./images/dory.jpg" alt="Pls don't hate me for this meme." width="800" />
+</p>
 
 At this point, it is possible to communicate with the controller by sending it commands and receiving events.
 However, the firmware contained in the CYW43438's ROM is buggy.
@@ -139,18 +148,20 @@ Today, we will be using ACL connections, which are equivalent to a TCP reliable 
 In contrast, audio usually uses SCO connections, which are more like sending UDP packets not knowing whether they will get there.
 Once a connection is established, the format for a packet is very simple:
 
-![Event format - HCI pdf page 776](./images/HCI%20acl%20format.png)
+<p align="center">
+<img src="./images/HCI%20acl%20format.png" alt="Event format - HCI pdf page 776" width="800" />
+</p>
 
 Let's start by filling in the remaining TODO's in `bt.c` to be able to send and receive ACL packets.
 Next, complete the TODO's in `5-connect.c` or `5-accept-connection.c` depending on whether you are Alice or Bob.
 These files contain a few commands at the top to show a good template for sending commands (including asserting all the replied values), but they are not strictly necessary.
+You will ned to find the commands that you need to use in the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
 Once you establish a connection, you should be able to type lines into your terminal and they should come out of your partner's terminal (telnet-style).
 
 Some important facts:
 
 * So far, we have been expecting to receive a Command Complete for every command, since they have all been synchronous. However, many connection-related commands actually respond with a Command Status event since they are asynchronous.
 * It is common for the HCI_Create_Connection event to fail sometimes, so you might want to try a few times or even build a loop that retries the connection until it works.
-
 
 ## Checkoff
 
