@@ -2,7 +2,7 @@
 
 #include "rpi.h"
 #include "bt.h"
-#include "hci_consts.h"
+#include "hci-consts.h"
 
 void notmain(void) {
     bt_init();

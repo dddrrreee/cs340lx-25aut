@@ -3,7 +3,7 @@
 #define CQE_T void*
 
 #include "bt.h"
-#include "hci_consts.h"
+#include "hci-consts.h"
 #include "rpi.h"
 #include "pl011.h"
 #include "circular.h"

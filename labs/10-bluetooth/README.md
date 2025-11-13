@@ -40,7 +40,8 @@ So far, we have been using the "mini UART" from the AUX device (`uart1`) for pri
 As you can see, pins 30-33 actually have both UARTs, `uart0` on GPIO function ALT3 and `uart1` on ALT5.
 Before we send anything, we also need to turn on GPIO45 for at least 800ms to power up the Bluetooth module.
 
-**Warning: our original GPIO code ignores all calls with pin numbers higher than 31. Since we only need to set the pins' function, we have provided a fixed `gpio_set_function_ext` to do so.**
+**Warning: our original GPIO code ignores all calls with pin numbers higher than 31.
+We have provided a few fixed functions in `gpio-high.h`**
 
 Some important facts:
 
@@ -63,7 +64,7 @@ First, the [UART transport layer section of the BT spec](./docs/BT%205.1%20H4%20
 To know how each packet type is laid out, let's take a look at the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
 Here is the format for a command. Notice that the first two octets are the OpCode. In the spec, you can read
 "The Opcode parameter is divided into two fields, called the OpCode Group Field (OGF) and OpCode Command Field (OCF). The OGF occupies the upper 6 bits of the Opcode, while the OCF occupies the remaining 10 bits."
-But all the opcodes you will need for today are specified in `hci_consts.h` so don't worry about it.
+But all the opcodes you will need for today are specified in `hci-consts.h` so don't worry about it.
 Next there is a one octet that specifies the total length of the parameters, in octets (some parameters can be multiple octets). Finally, the parameters themselves.
 Notice that this means that when we receive a packet, we need to wait until we have three octets to know how long it will be.
 **Important: everything is little endian, so if something is multiple bytes, send the least significant bytes first!!**
@@ -89,7 +90,7 @@ The solution is to send the device a Broadcom-provided patch every time the devi
 The process is as follows (as reverse-engineered from Linux):
 
 1. Send an HCI_Reset command.
-1. Send command with OGF 0x3f (denotes a vendor-specific command) and OCF 0x2e, so signal the start of the firmware patch. We provide this constant in `hci_consts.h` with the name `CMD_BCM_LOAD_FIRMWARE`.
+1. Send command with OGF 0x3f (denotes a vendor-specific command) and OCF 0x2e, so signal the start of the firmware patch. We provide this constant in `hci-consts.h` with the name `CMD_BCM_LOAD_FIRMWARE`.
 1. Wait 50ms.
 1. Send all the bytes in BCM43430A1.hcd (see below for how to to this while respecting flow control).
 1. Wait 250ms.

@@ -2,7 +2,7 @@
 
 #include "bt.h"
 #include "demand.h"
-#include "hci_consts.h"
+#include "hci-consts.h"
 #include "rpi.h"
 #include <string.h>
 
