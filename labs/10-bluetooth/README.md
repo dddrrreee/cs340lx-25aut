@@ -177,8 +177,9 @@ Once a connection is established, the format for an ACL data packet is very simp
 </p>
 
 The first octet and lower half of the second octet designate the connection handle to which this data packet should be sent.
-The upper half of the second octet .
+The upper half of the second octet stores two flags, which we will set to zero today.
 Since your handle variable will already have those upper bits set to zero, you can simply send the handle in little-endian format as if it took up the first two octets.
+What follows is a massive 16-bit length field and the data.
 
 Let's start by filling in the remaining TODO's in `bt.c` to be able to send and receive ACL packets.
 Next, complete the TODO's in `5-connect.c` or `5-accept-connection.c` depending on whether you are Alice or Bob.
