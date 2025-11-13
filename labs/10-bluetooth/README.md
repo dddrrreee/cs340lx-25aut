@@ -184,7 +184,7 @@ What follows is a massive 16-bit length field and the data.
 Let's start by filling in the remaining TODO's in `bt.c` to be able to send and receive ACL packets.
 Next, complete the TODO's in `5-connect.c` or `5-accept-connection.c` depending on whether you are Alice or Bob.
 These files contain a few commands at the top to show a good template for sending commands (including asserting all the replied values), but they are not strictly necessary.
-You will ned to find the commands that you need to use in the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
+You will need to find the commands that you need to use in the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
 Once you establish a connection, you should be able to type lines into your terminal and they should come out of your partner's terminal (telnet-style).
 
 Some important facts:

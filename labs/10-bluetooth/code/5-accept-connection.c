@@ -7,9 +7,11 @@
 #include <string.h>
 
 // Pick your own local name!
-static const char LOCAL_NAME[] = "RPI accepter";
+static const char LOCAL_NAME[] = "RPI Bob";
 
-// Peer address in big endian format (note that you have to send in little endian!)
+// This is Bob's file!
+
+// Alice's address in big endian format (note that you have to send in little endian!)
 static u8 peer_addr_be[] = { 
     0x1e, 0x70, 0x01, 0x14, 0x68, 0x05, // equivalent to 1e:70:01:14:68:05
 };
