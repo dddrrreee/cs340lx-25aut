@@ -5,7 +5,7 @@
 #endif
 
 
-static void emit_val(unsigned base, uint32_t u) {
+static void emit_val(unsigned base, uint32_t u, unsigned padding) {
     char num[33], *p = num;
 
     switch(base) {
@@ -26,6 +26,12 @@ static void emit_val(unsigned base, uint32_t u) {
         break;
     default: 
         panic("invalid base=%d\n", base);
+    }
+
+    // emit any padding
+    while(padding > (unsigned)(p - &num[0])) {
+        putchar('0');
+        padding--;
     }
 
     // buffered in reverse, so emit backwards
@@ -55,7 +61,7 @@ static void __emit_float(double d) {
         putchar('-');
         d = -d;
     }
-    emit_val(10, fp_get_integral(d));
+    emit_val(10, fp_get_integral(d), 0);
     putchar('.');
 
     // changes below
@@ -66,7 +72,7 @@ static void __emit_float(double d) {
         divisor /= 10;
     }
 
-    emit_val(10, frac);
+    emit_val(10, frac, 0);
 }
 
 #endif
@@ -86,8 +92,8 @@ int vprintk(const char *fmt, va_list ap) {
             char *s;
 
             switch(*fmt) {
-            case 'b': emit_val(2, va_arg(ap, uint32_t)); break;
-            case 'u': emit_val(10, va_arg(ap, uint32_t)); break;
+            case 'b': emit_val(2, va_arg(ap, uint32_t), 0); break;
+            case 'u': emit_val(10, va_arg(ap, uint32_t), 0); break;
             case 'c': putchar(va_arg(ap, int)); break;
 
             // we only handle %llx.   
@@ -108,8 +114,23 @@ int vprintk(const char *fmt, va_list ap) {
                 uint32_t hi = x>>32;
                 uint32_t lo = x;
                 if(hi)
-                    emit_val(16, hi);
-                emit_val(16, lo);
+                    emit_val(16, hi, 0);
+                emit_val(16, lo, 0);
+                break;
+
+            case '0':
+                // only handle %0Nx
+                fmt++;
+                {
+                    int n = 0;
+                    while(*fmt >= '0' && *fmt <= '9') {
+                        n = n * 10 + (*fmt - '0');
+                        fmt++;
+                    }
+                    if(*fmt != 'x')
+                        panic("only handling %0Nx format, have: <%s>\n", fmt);
+                    emit_val(16, va_arg(ap, uint32_t), n);
+                }
                 break;
 
             // leading 0x
@@ -117,7 +138,7 @@ int vprintk(const char *fmt, va_list ap) {
             case 'p': 
                 putchar('0');
                 putchar('x');
-                emit_val(16, va_arg(ap, uint32_t));
+                emit_val(16, va_arg(ap, uint32_t), 0);
                 break;
             // print '-' if < 0
             case 'd':
@@ -126,7 +147,7 @@ int vprintk(const char *fmt, va_list ap) {
                     putchar('-');
                     v = -v;
                 }
-                emit_val(10, v);
+                emit_val(10, v, 0);
                 break;
             // string
             case 's':
@@ -175,3 +196,4 @@ void notmain(void) {
     new_printk("hello=<%s>\n", "hello");
 }
 #endif
+
