@@ -19,5 +19,7 @@ void notmain(void) {
     assert(evt->params[1] == (CMD_RESET & 0xff)); // opcode LSB
     assert(evt->params[2] == (CMD_RESET >> 8));   // opcode
     assert(evt->params[3] == 0); // status == 0 (success)
+
+    printk("Success!\n");
 }
 

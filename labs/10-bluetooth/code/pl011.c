@@ -2,11 +2,11 @@
 
 #define CQ_N 131072
 
-#include "gpio.h"
 #include "rpi.h"
 #include "pl011.h"
 #include "circular.h"
 #include "rpi-interrupts.h"
+#include "gpio-high.h"
 
 #include <stdbool.h>
 
@@ -109,7 +109,7 @@ void pl011_init(void) {
     todo("Clear the interrupts using the ICR register");
     todo("Set the integer & fractional baud rate registers (IBRD, FBRD)");
     todo("Set the interrupt mask register (IMSC) to enable RX and RX timeout interrupts");
-    todo("Set the interrupt FIFO level select register (IFLS) to generate interrupts as soonq as data is available");
+    todo("Set the interrupt FIFO level select register (IFLS) to generate interrupts as soon as data is available");
     todo("Set the line control register (LCRH) to 8n1 and enable FIFOs");
 
     // Enable UART

@@ -1,6 +1,7 @@
 PROGS = 1-test-pl011.c
-# PROGS = 2-firmware-upload.c
-# PROGS = 3-read-bdaddr.c
+# PROGS = 2-hci-reset.c
+# PROGS = 3-firmware-upload.c
+# PROGS = 4-read-bdaddr.c
 # PROGS = 5-connect.c
 # PROGS = 5-accept-connection.c
 

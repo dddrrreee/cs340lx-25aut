@@ -7,6 +7,7 @@
 #include "rpi.h"
 #include "pl011.h"
 #include "circular.h"
+#include "gpio-high.h"
 
 #include <stdbool.h>
 
@@ -31,7 +32,7 @@ void bt_init(void) {
     cq_init(&module.event_rx_buffer, true);
     kmalloc_init(100); // no free, so get a bunch of space
 
-    todo("Set the Bluetooth enable pin to on and wait for 800ms. Remember to use gpio_hi.");
+    todo("Set the Bluetooth enable pin (BT_EN) to on and wait for 800ms. Remember to use gpio_hi.");
 }
 
 /*
@@ -191,7 +192,7 @@ void bt_upload_firmware(void) {
 
     // Purge event queue
     todo("Purge all the command complete events, (hint: you know that "
-            "you sent packets_sent commands");
+            "you sent n_packets_sent commands)");
 
     printk("Waiting 250ms for patch to take effect...\n");
     delay_ms(250); // same time as linux

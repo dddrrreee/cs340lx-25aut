@@ -87,7 +87,7 @@ You shouldn't have to worry too much about this today since we provide `hci-cons
 Next, there is one octet that specifies the total length of the parameters, in octets (some parameters can be multiple octets).
 Finally, the parameters themselves.
 Notice that this means that when we receive a packet, we need to wait until we have three octets to know how long it will be.
-**Important: everything is little endian, so if something is multiple bytes, send the least significant bytes first!!**
+**Important: everything is [little endian](https://en.wikipedia.org/wiki/Endianness), so if something is multiple bytes, send the least significant bytes first!!**
 
 And this is the format for an event:
 
@@ -175,6 +175,10 @@ Once a connection is established, the format for an ACL data packet is very simp
 <p align="center">
 <img src="./images/HCI%20acl%20format.png" alt="Event format - HCI pdf page 776" width="800" />
 </p>
+
+The first octet and lower half of the second octet designate the connection handle to which this data packet should be sent.
+The upper half of the second octet .
+Since your handle variable will already have those upper bits set to zero, you can simply send the handle in little-endian format as if it took up the first two octets.
 
 Let's start by filling in the remaining TODO's in `bt.c` to be able to send and receive ACL packets.
 Next, complete the TODO's in `5-connect.c` or `5-accept-connection.c` depending on whether you are Alice or Bob.
