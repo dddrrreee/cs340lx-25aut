@@ -78,10 +78,14 @@ Here is the format for a command:
 <img src="./images/HCI command format.png" alt="Command format - HCI pdf page 770" width="800" />
 </p>
 
-Notice that the first two octets are the OpCode. In the spec, you can read
-"The Opcode parameter is divided into two fields, called the OpCode Group Field (OGF) and OpCode Command Field (OCF). The OGF occupies the upper 6 bits of the Opcode, while the OCF occupies the remaining 10 bits."
-But all the opcodes you will need for today are specified in `hci-consts.h` so don't worry about it.
-Next there is a one octet that specifies the total length of the parameters, in octets (some parameters can be multiple octets). Finally, the parameters themselves.
+Notice that the first two octets (the spec uses the word "octet" to refer to bytes) form the OpCode.
+In the spec, you can read
+"The Opcode parameter is divided into two fields, called the OpCode Group Field (OGF) and OpCode Command Field (OCF).
+The OGF occupies the upper 6 bits of the Opcode, while the OCF occupies the remaining 10 bits."
+The OGF identifies roughly the group the command belongs to and the OCF identifies the command in particular.
+You shouldn't have to worry too much about this today since we provide `hci-consts.h`, which contains the OpCode for most important commands.
+Next, there is one octet that specifies the total length of the parameters, in octets (some parameters can be multiple octets).
+Finally, the parameters themselves.
 Notice that this means that when we receive a packet, we need to wait until we have three octets to know how long it will be.
 **Important: everything is little endian, so if something is multiple bytes, send the least significant bytes first!!**
 
@@ -91,12 +95,21 @@ And this is the format for an event:
 <img src="./images/HCI event format.png" alt="Event format - HCI pdf page 776" width="800" />
 </p>
 
-Notice that it is quite similar, with the only difference that the event code is one instead of two octets.
+Notice that it is quite similar, with the only difference that the event code (roughly equivalent to the OpCode) is one instead of two octets.
+
+To prevent the controller from being overwhelmed, the spec provides for a command flow control system:
+
+<p align="center">
+<img src="./images/HCI command flow control.png" alt="Command flow control - HCI pdf page 79" width="600" />
+</p>
+
+We provide you the code that implements this, but you should know about it since it will come up later.
+Also, although in theory commands can finish out of order, we assume for this lab that this won't happen (I have never observed it).
 
 Complete the TODO's in `bt.c` for the following functions: `bt_init`, `_receive_event`, and `bt_send_command`.
 You will notice that the function `_receive_packet` is called when the user of this module requests a packet synchronously (or asynchronously but there is pending data).
-It determines the packet type based on the first type and calls the appropriate function, which also blocks until it has received a complete packet.
-You should be able to pass `2-hci-reset.c`, executes an HCI_Reset command and waits for the response.
+It determines the packet type based on the first byte and calls the appropriate function, which also blocks until it has received a complete packet.
+You should be able to pass `2-hci-reset.c`, which executes an HCI_Reset command and waits for the response.
 
 ## Uploading the firmware patch
 
@@ -104,19 +117,19 @@ You should be able to pass `2-hci-reset.c`, executes an HCI_Reset command and wa
 <img src="./images/dory.jpg" alt="Pls don't hate me for this meme." width="514" />
 </p>
 
-At this point, it is possible to communicate with the controller by sending it commands and receiving events.
+At this point, we can communicate with the controller by sending it commands and receiving events.
 However, the firmware contained in the CYW43438's ROM is buggy.
 The solution is to send the device a Broadcom-provided patch every time the device powers up.
 The process is as follows (as reverse-engineered from Linux):
 
 1. Send an HCI_Reset command.
-1. Send command with OGF 0x3f (denotes a vendor-specific command) and OCF 0x2e, so signal the start of the firmware patch. We provide this constant in `hci-consts.h` with the name `CMD_BCM_LOAD_FIRMWARE`.
+1. Send command with OGF 0x3f (denotes a vendor-specific command) and OCF 0x2e, to signal the start of the firmware patch. We provide this constant in `hci-consts.h` with the name `CMD_BCM_LOAD_FIRMWARE`.
 1. Wait 50ms.
 1. Send all the bytes in BCM43430A1.hcd (see below for how to to this while respecting flow control).
 1. Wait 250ms.
 
 There are many ways to get access to the data from the C code.
-The "correct" thing to do would be to put it on the SD card or at include it in the my-install program with an appropriate place in the link file.
+The "correct" thing to do would be to put it on the SD card or include it in the my-install program with an appropriate place in the link file.
 My favorite way is to use the xxd tool to make a C code file with the data using the following command `xxd -i BCM43430A1.hcd > BCM43430A1.c` and uncomment the corresponding line in the Makefile.
 The output should be something like this:
 
@@ -131,7 +144,7 @@ unsigned char BCM43430A1_hcd[] = {
 unsigned int BCM43430A1_hcd_len = 30049;
 ```
 
-In theory, we could just send all of the bytes to the device for step 4 with a simple for loop and calls to `pl011_put8()`.
+For step 4, we could theoretically just send all of the bytes to the device for step 4 with a simple for loop and calls to `pl011_put8()`.
 However, if we look very carefully, we can realize that these bytes are just a sequence of commands sent one after the other, each containing a chunk of the patch.
 Therefore, we really should be respecting the flow control we implemented in the previous part.
 To do so, instead of just sending the bytes, we are going to interpret them and send them using the `bt_send_command()`, which we have already programmed to respect flow control.
@@ -147,7 +160,7 @@ Now you will establish a connection with your friend.
 Step 1, find someone you get along with (alternatively, make a new friend).
 Step 2, decide who will actively establish the connection (whom I will call Alice) and who will accept it (naturally, Bob).
 
-Although Bluetooth provides a mechanism to discover devices by "advertising," we are going to take the lazy route of having Alice directly connecting to Bob using his BD_ADDR.
+Although Bluetooth provides a mechanism to discover devices by "advertising," we are going to take the lazy route of having Alice directly connect to Bob using his BD_ADDR.
 To do so, Bob has to listen for connections by enabling "page scanning."
 Alice then issues the command HCI_Create_Connection with Bob's BD_ADDR.
 Bob receives an event Connection Request containing Alice's BD_ADDR.
@@ -157,7 +170,7 @@ The handle allows one device to keep multiple connections.
 
 Today, we will be using ACL connections, which are equivalent to a TCP reliable bytestream (although they can be configured to be less reliable and faster).
 In contrast, audio usually uses SCO connections, which are more like sending UDP packets not knowing whether they will get there.
-Once a connection is established, the format for a packet is very simple:
+Once a connection is established, the format for an ACL data packet is very simple:
 
 <p align="center">
 <img src="./images/HCI%20acl%20format.png" alt="Event format - HCI pdf page 776" width="800" />
