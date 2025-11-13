@@ -26,7 +26,7 @@ This external chip used to be manufactured by Broadcom too until they sold the r
 In practice, the Bluetooth and WiFi aspects are completely independent for our purposes.
 
 The Bluetooth spec is quite complicated (2,900+ pages), including specifications on which RF frequencies to use, how to encode and decode the data, etc.
-Luckily, we need only be concerned with the "Host-Controller Interface" section of the spec, which describes a protocol for a host (our CPU) to communicate to a controller (the CYW43438) with a series of higher level commands such as "listen for incoming connections" and "send this data to that device."
+Luckily, we need only be concerned with the "Host-Controller Interface" section of the spec, which describes a protocol for a host (our CPU) to communicate with a controller (the CYW43438) with a series of higher level commands such as "listen for incoming connections" and "send this data to that device."
 These commands are sent over a simple UART interface which is wired to GPIO pins 30-33.
 
 In this lab, you will use these commands to connect to a friend's Pi and send them a message.
@@ -48,39 +48,50 @@ Some important facts:
 
 * Baud rate 115200 (from the [Infineon CYW43438 datasheet](./docs/Infineon%20CYW43438.pdf)).
 * Use 8 data bits, no parity, 1 stop bit, AKA `8n1` (from the [Bluetooth UART transport layer](./docs/BT%205.1%20H4%20UART.pdf)).
-* Make sure to enable CTS/RTS, or the device will think that the host is unable to receive data.
+* Make sure to enable RTS, or the device will think that the host is unable to receive data.
 
-Open `pl011.c` and fill in the TODO's. You will notice that the implementation uses interrupts for receiving (so as not to miss any bytes) but writes synchronously. You will need to reference the [BCM2835 peripherals](./docs/BCM2835-ARM-Peripherals.annot.pdf). Once test `1-test-pl011.c` passes, you may proceed to the next part. It sends a HCI_Reset command to the controller and expects a reply (more on that on the next section).
+Open `pl011.c` and fill in the TODO's. You will notice that the implementation uses interrupts for receiving (so as not to miss any bytes) but writes synchronously. You will need to reference the [BCM2835 peripherals](./docs/BCM2835-ARM-Peripherals.annot.pdf).
+Once test `1-test-pl011.c` passes, you may proceed to the next part.
+The test sends a HCI_Reset command to the controller and expects a reply (more on how that works will follow shortly).
 
 ## Sending commands and receiving events
 
-Now that we can send bytes back and forth, let's talk to it. The main protocol that concerns us is the Host-Controller Interface, or HCI (keep the [spec extract](./docs/BT%205.1%20HCI.pdf) open as you work on the lab). The basic structure is that the host (that is, us) sends the controller (the BT module) commands. Then, the controller replies with events. Most events happen in response to a command (for example, HCI_Command_Complete), but some can happen spontaneously (like HCI_Disconnection_Complete). Once you establish a connection, data can be sent and received using so-called ACL data packets (we will ignore Synchronous/SCO data packets today).
+Now that we can send bytes back and forth, let's talk to it.
+The main protocol that concerns us is the Host-Controller Interface, or HCI (keep the [spec extract](./docs/BT%205.1%20HCI.pdf) open as you work on the lab).
+The basic structure is that the host (that is, us) sends the controller (the BT module) commands.
+Then, the controller replies with events.
+Most events happen in response to a command (for example, HCI_Command_Complete), but some can happen spontaneously (like HCI_Disconnection_Complete).
+Once you establish a connection, data can be sent and received using so-called ACL data packets (we will ignore Synchronous/SCO data packets today).
 
 Let's start by sending an HCI_Reset command, which should always be the first command that we send.
 Right now, we have a full-duplex connection with the BT module through which we exchange streams of bytes, but there is no way of knowing when a new packet starts or what type it is.
-First, the [UART transport layer section of the BT spec](./docs/BT%205.1%20H4%20UART.pdf) tells us how to identify each packet type:
+The [UART transport layer section of the BT spec](./docs/BT%205.1%20H4%20UART.pdf) tells us how to identify each packet type:
 
 <p align="center">
 <img src="./images/H4 packet types.png" alt="Table from BLUETOOTH CORE SPECIFICATION Version 5.1 | Vol 4, Part A page 2528" width="600" />
 </p>
 
 To know how each packet type is laid out, let's take a look at the [HCI section of the Bluetooth spec](./docs/BT%205.1%20HCI.pdf).
-Here is the format for a command. Notice that the first two octets are the OpCode. In the spec, you can read
+Here is the format for a command:
+
+<p align="center">
+<img src="./images/HCI command format.png" alt="Command format - HCI pdf page 770" width="800" />
+</p>
+
+Notice that the first two octets are the OpCode. In the spec, you can read
 "The Opcode parameter is divided into two fields, called the OpCode Group Field (OGF) and OpCode Command Field (OCF). The OGF occupies the upper 6 bits of the Opcode, while the OCF occupies the remaining 10 bits."
 But all the opcodes you will need for today are specified in `hci-consts.h` so don't worry about it.
 Next there is a one octet that specifies the total length of the parameters, in octets (some parameters can be multiple octets). Finally, the parameters themselves.
 Notice that this means that when we receive a packet, we need to wait until we have three octets to know how long it will be.
 **Important: everything is little endian, so if something is multiple bytes, send the least significant bytes first!!**
 
-<p align="center">
-<img src="./images/HCI command format.png" alt="Command format - HCI pdf page 770" width="800" />
-</p>
-
-And this is the format for an event. Notice that it is quite similar, with the only difference that the event code is one instead of two octets.
+And this is the format for an event:
 
 <p align="center">
 <img src="./images/HCI event format.png" alt="Event format - HCI pdf page 776" width="800" />
 </p>
+
+Notice that it is quite similar, with the only difference that the event code is one instead of two octets.
 
 Complete the TODO's in `bt.c` for the following functions: `bt_init`, `_receive_event`, and `bt_send_command`.
 You will notice that the function `_receive_packet` is called when the user of this module requests a packet synchronously (or asynchronously but there is pending data).
