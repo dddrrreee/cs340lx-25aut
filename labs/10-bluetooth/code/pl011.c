@@ -98,7 +98,8 @@ void pl011_init(void) {
 
     dev_barrier();
 
-    todo("Set up GPIO pins for UART0 functionality and disable pull-ups/downs");
+    todo("Set up GPIO pins for UART0 functionality and disable pull-ups/downs."
+            "We need all 4 pins. Remember to use gpio_hi.");
 
     dev_barrier();
 

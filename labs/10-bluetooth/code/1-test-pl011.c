@@ -3,12 +3,13 @@
 #include "rpi.h"
 #include "pl011.h"
 #include "bt.h"
+#include "gpio-high.h"
 
 void notmain(void) {
     pl011_init();
 
-    gpio_set_output(BT_EN); // BT_EN
-    gpio_set_on(BT_EN);
+    gpio_hi_set_output(BT_EN); // BT_EN
+    gpio_hi_set_on(BT_EN);
     delay_ms(800);
 
     u8 hci_reset[] = {

@@ -31,7 +31,7 @@ void bt_init(void) {
     cq_init(&module.event_rx_buffer, true);
     kmalloc_init(100); // no free, so get a bunch of space
 
-    todo("Set the Bluetooth enable pin to on and wait for 800ms. Remember to use gpio_ext.");
+    todo("Set the Bluetooth enable pin to on and wait for 800ms. Remember to use gpio_hi.");
 }
 
 /*
