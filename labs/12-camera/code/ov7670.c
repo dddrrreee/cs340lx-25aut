@@ -61,38 +61,38 @@ void wait_neg_edge(uint32_t pin) {
   while (gpio_read(pin));
 }
 
+
 uint8_t read_byte(void) {
   // Reaad D0-D7 as a byte. 
   // You can make this faster!
-  uint8_t pixel = 0;
-  pixel = gpio_read(D7) << 7 | gpio_read(D6) << 6 | gpio_read(D5) << 5 |
-          gpio_read(D4) << 4 | gpio_read(D3) << 3 | gpio_read(D2) << 2 |
-          gpio_read(D1) << 1 | gpio_read(D0);
-  return pixel;
+  uint8_t byte = 0;
+  byte = gpio_read(D7) << 7 | gpio_read(D6) << 6 | gpio_read(D5) << 5 |
+         gpio_read(D4) << 4 | gpio_read(D3) << 3 | gpio_read(D2) << 2 |
+         gpio_read(D1) << 1 | gpio_read(D0);
+  return byte;
 }
 
-// Optimized version with bit masking instead of branching
-static inline void extract_rgb565(uint32_t byte1, uint32_t byte2, 
-                                   uint8_t *r, uint8_t *g, uint8_t *b) {
+// Get pixel values from gpio inputs
+static inline struct RGB extract_rgb565() {
+  struct RGB pixel;
+  uint8_t byte1, byte2;
+
+  // Get two bytes from gpio inputs
+  // When you see a pclk rising edge, get a byte
+  // Use wait_pos_edge() and wait_neg_edge(), or use GPIO_READ_BANK0 defined in ov7670.h
+  // to make it faster
+  todo("get byte1 and byte2");
+
+  // Assign pixel's value (r, g, b) by byte 1 and byte 2 
   // RGB565 format:
   // Byte 1: D7-D3 = Red[4:0], D2-D0 = Green[5:3]
   // Byte 2: D7-D5 = Green[2:0], D4-D0 = Blue[4:0]
-  uint32_t d_mask_1 = (byte1 >> 6) & 0xFF;
-  uint32_t d_mask_2 = (byte2 >> 6) & 0xFF;
-  
-  *r = (d_mask_1 & 0xF8);
-  *g = ((d_mask_1 & 0x07) << 5) | ((d_mask_2 & 0xE0) >> 3);
-  *b = (d_mask_2 & 0x1F) << 3;
+  todo("assign pixel.r, pixel.g, and pixel.b");
+
+  return pixel;
 }
 
-void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset) {
-  uint32_t Stat;
-  uint32_t t_start = 0, t_end = 0;
-  const uint32_t WAIT_TIME_MS = 100;
-  uint32_t pclk_mask = (1<<PCLK);
-  uint8_t contrast = 0x50;
-  
-
+void camera_display(uint8_t *fb, uint32_t *height_offset) {
   while(1) {
     wait_neg_edge(VS);
     
@@ -103,32 +103,18 @@ void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset) {
       *height_offset = 0;
     }
     
+    // Get pixels from camera
     for (int i = 0; i < IMAGE_HEIGHT; i++) {
       wait_pos_edge(HS);
       int line_offset = (i + *height_offset) * BYTES_PER_ROW;
       
       for (int j = 0; j < IMAGE_WIDTH; j++) {
-        uint32_t gpio1, gpio2;
-        
-        while(!(GPIO_READ_BANK0 & pclk_mask)) {
-          Stat = GPIO_READ_BANK0; 
-          if(Stat & pclk_mask) break;
-        }
-        gpio1 = GPIO_READ_BANK0;
-        
-        while(!(GPIO_READ_BANK0 & pclk_mask)) {
-          Stat = GPIO_READ_BANK0; 
-          if(Stat & pclk_mask) break;
-        }
-        gpio2 = GPIO_READ_BANK0;
-        
-        uint8_t r, g, b;
-        extract_rgb565(gpio1, gpio2, &r, &g, &b);
-        
+        struct RGB pixel = extract_rgb565();
         int fb_idx = line_offset + 4*j;
-        fb[fb_idx] = b;
-        fb[fb_idx + 1] = g;
-        fb[fb_idx + 2] = r;
+        // assign pixel to frame buffer
+        fb[fb_idx] = pixel.b;
+        fb[fb_idx + 1] = pixel.g;
+        fb[fb_idx + 2] = pixel.r;
         fb[fb_idx + 3] = 0xF0;
       }
     }
@@ -137,11 +123,30 @@ void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset) {
   }
 }
 
-void Camera_pclk_test(void) {
-  uint32_t t_start, t_end;
+// Print pixels' red component. 
+// You can use the printed numbers to generate a .jpg image. 
+void print_camera_value() {
+  uint8_t img_raw_buffer[(IMAGE_HEIGHT+1)/20 * (IMAGE_WIDTH+1)/20] = {0};
   wait_neg_edge(VS);
-  t_start = timer_get_usec();
-  wait_neg_edge(VS);
-  t_end = timer_get_usec();
-  trace("Time spent in a camera frame: %d usec\n", t_end - t_start);
+  
+  // Get pixels from camera
+  for (int i = 0; i < IMAGE_HEIGHT; i++) {
+    wait_pos_edge(HS);
+    
+    for (int j = 0; j < IMAGE_WIDTH; j++) {
+      struct RGB pixel = extract_rgb565();
+      // assign pixel to frame buffer
+      if ((j % 20) == 0 && (i % 20) == 0) {
+        img_raw_buffer[i/20*(IMAGE_WIDTH/20) + j/20] = pixel.r;
+      }
+    }
+  }
+
+  // print pixel
+  for (int i = 0; i < (IMAGE_HEIGHT+1)/20; i++) {
+    for (int j = 0; j < (IMAGE_WIDTH+1)/20; j++) {
+      printk("%d ,", img_raw_buffer[i * (IMAGE_WIDTH/20) + j]);
+    }
+    printk("\n");
+  }
 }

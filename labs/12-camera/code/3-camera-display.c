@@ -15,5 +15,6 @@ void notmain(void) {
     uint32_t height_offset = PHY_HEIGHT;
     uint8_t* fb;
     fb = device_initialize(PHY_WIDTH, PHY_HEIGHT, VIR_WIDTH, VIR_HEIGHT, DEPTH, BGR);
-    Camera_Tx_pixel(fb, &height_offset);
+    camera_display(fb, &height_offset);
+    // print_camera_value();
 }

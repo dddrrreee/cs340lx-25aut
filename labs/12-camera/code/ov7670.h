@@ -130,6 +130,5 @@ void camera_register_setup(void);
 void wait_pos_edge(uint32_t pin);
 void wait_neg_edge(uint32_t pin);
 uint8_t read_byte(void);
-void Camera_Tx_YUV(void);
-void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset);
-void Camera_pclk_test(void);
+void camera_display(uint8_t *fb, uint32_t *height_offset);
+void print_camera_value(void);
