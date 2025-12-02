@@ -72,20 +72,6 @@ void camera_register_setup(void) {
   imu_wr(SLAVE_ADDR, REG_COM7, COM7_RESET);
   delay_ms(WAIT_TIME_MS);
 
-  // set hardware window
-  imu_wr(SLAVE_ADDR, REG_HSTART, 0x16);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_HSTOP, 0x04);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_HREF, 0x24);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_VSTART, 0x02);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_VSTOP, 0x7a);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_VREF, 0x0a);
-  delay_ms(WAIT_TIME_MS);
-
   // no downscaling
   imu_wr(SLAVE_ADDR, REG_SCALEDCW, 0x00);
   delay_ms(WAIT_TIME_MS);
@@ -111,12 +97,10 @@ void camera_register_setup(void) {
   imu_wr(SLAVE_ADDR, REG_HSYEN, 0x00);
   delay_ms(WAIT_TIME_MS);
 
-  // data format: RGB444
+  // data format: RGB565
   imu_wr(SLAVE_ADDR, REG_COM7, COM7_RGB);
   delay_ms(WAIT_TIME_MS);
   imu_wr(SLAVE_ADDR, REG_COM15, COM15_RGB565 | COM15_R00FF);
-  delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, REG_RGB444, 0x00);
   delay_ms(WAIT_TIME_MS);
 
   // Edge enhancement (was 0xFF=max, try moderate level)
@@ -137,15 +121,15 @@ void camera_register_setup(void) {
   delay_ms(WAIT_TIME_MS);
 
   // matrix coefficient that I don't understand
-  imu_wr(SLAVE_ADDR, REG_CMATRIX_BASE, 0xFF);
+  imu_wr(SLAVE_ADDR, REG_CMATRIX1, 0xFF);
   delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, 0x50, 0x00);  // MTX2 - increased for more saturation
+  imu_wr(SLAVE_ADDR, REG_CMATRIX2, 0x00);  // MTX2 - increased for more saturation
   delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, 0x51, 0x00);  // MTX3
+  imu_wr(SLAVE_ADDR, REG_CMATRIX3, 0x00);  // MTX3
   delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, 0x52, 0x10);  // MTX4 - controls color balance
+  imu_wr(SLAVE_ADDR, REG_CMATRIX4, 0x10);  // MTX4 - controls color balance
   delay_ms(WAIT_TIME_MS);
-  imu_wr(SLAVE_ADDR, 0x53, 0x72);  // MTX5 - controls color balance
+  imu_wr(SLAVE_ADDR, REG_CMATRIX5, 0x72);  // MTX5 - controls color balance
   delay_ms(WAIT_TIME_MS);
   // imu_wr(SLAVE_ADDR, 0x54, 0x60);  // MTX6 - increased for more saturation
   // delay_ms(WAIT_TIME_MS);
@@ -232,27 +216,38 @@ void Camera_pclk_test(void) {
 }
 
 // Optimized version with bit masking instead of branching
-static inline void extract_rgb565(uint32_t byte1, uint32_t byte2, 
-                                   uint8_t *r, uint8_t *g, uint8_t *b) {
-  // RGB565 format:
-  // Byte 1: D7-D3 = Red[4:0], D2-D0 = Green[5:3]
-  // Byte 2: D7-D5 = Green[2:0], D4-D0 = Blue[4:0]
-  uint32_t d_mask_1 = (byte1 >> 6) & 0xFF;
-  uint32_t d_mask_2 = (byte2 >> 6) & 0xFF;
+static inline struct RGB extract_rgb565() {
+  uint32_t gpio1, gpio2;
+  uint32_t pclk_mask = (1<<PCLK);
+  uint32_t Stat;
+
+  while(!(GPIO_READ_BANK0 & pclk_mask)) {
+    Stat = GPIO_READ_BANK0; 
+    if(Stat & pclk_mask) break;
+  }
+  gpio1 = GPIO_READ_BANK0;
   
-  *r = (d_mask_1 & 0xF8);
-  *g = ((d_mask_1 & 0x07) << 5) | ((d_mask_2 & 0xE0) >> 3);
-  *b = (d_mask_2 & 0x1F) << 3;
-  // printk("%d", byte1 & 0b10000000);
+  while(!(GPIO_READ_BANK0 & pclk_mask)) {
+    Stat = GPIO_READ_BANK0; 
+    if(Stat & pclk_mask) break;
+  }
+  gpio2 = GPIO_READ_BANK0;
+  
+
+  uint32_t d_mask_1 = (gpio1 >> 6) & 0xFF;
+  uint32_t d_mask_2 = (gpio2 >> 6) & 0xFF;
+  struct RGB pixel;
+  pixel.r = (d_mask_1 & 0xF8);
+  pixel.g = ((d_mask_1 & 0x07) << 5) | ((d_mask_2 & 0xE0) >> 3);
+  pixel.b = (d_mask_2 & 0x1F) << 3;
+
+  return pixel;
+
 }
 
 void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset) {
-  uint32_t Stat;
   uint32_t t_start = 0, t_end = 0;
   const uint32_t WAIT_TIME_MS = 100;
-  uint32_t pclk_mask = (1<<PCLK);
-  uint8_t brightness = 0x10;
-  uint8_t contrast = 0x50;
 
   while(1) {
     wait_neg_edge(VS);
@@ -269,27 +264,12 @@ void Camera_Tx_pixel(uint8_t *fb, uint32_t *height_offset) {
       int line_offset = (i + *height_offset) * BYTES_PER_ROW;
       
       for (int j = 0; j < IMAGE_WIDTH; j++) {
-        uint32_t gpio1, gpio2;
         
-        while(!(GPIO_READ_BANK0 & pclk_mask)) {
-          Stat = GPIO_READ_BANK0; 
-          if(Stat & pclk_mask) break;
-        }
-        gpio1 = GPIO_READ_BANK0;
-        
-        while(!(GPIO_READ_BANK0 & pclk_mask)) {
-          Stat = GPIO_READ_BANK0; 
-          if(Stat & pclk_mask) break;
-        }
-        gpio2 = GPIO_READ_BANK0;
-        
-        uint8_t r, g, b;
-        extract_rgb565(gpio1, gpio2, &r, &g, &b);
-        
+        struct RGB pixel = extract_rgb565();
         int fb_idx = line_offset + 4*j;
-        fb[fb_idx] = b;
-        fb[fb_idx + 1] = g;
-        fb[fb_idx + 2] = r;
+        fb[fb_idx] = pixel.b;
+        fb[fb_idx + 1] = pixel.g;
+        fb[fb_idx + 2] = pixel.r;
         fb[fb_idx + 3] = 0xF0;
       }
     }
