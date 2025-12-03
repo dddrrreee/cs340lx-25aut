@@ -46,7 +46,7 @@ See p.107 for GPIO clock control, and p.108 for clock divisor.
 The `code` folder includes the staff's implementation `i2c.o` and `mbox.o`. To drop in your own I2C driver and mbox implementation, add it to `COMMON_SRC` and 
 remove `PREBUILT_OBJS` from the Makefile. 
 
-Pass `1-pin-setup.c` before starting the next part. \
+Pass `1-pin-setup.c` before starting the next part. 
 
 ----------------------------------------------------------------------
 ### Part 2: Control Register Setup
@@ -54,9 +54,9 @@ Before getting pixels from the camera, we need to set the camera's control regis
 
 There are around 200 configurable control registers, listed in p.11-26 in the OV7670 datasheet. Most of them are related to color (including brightness, contrast, and various matrices). If we only care about the correct frequency, image size, and data format, only a few of them need to be configured.
 
-To set these registers, we will use the imu_wr() function to transmit the register address and data to the camera through I2C. Some examples are in camera_register_setup().
+To set these registers, we will use the `imu_wr()` function to transmit the register address and data to the camera through I2C. Some examples are in `camera_register_setup()`.
 
-Complete the camera_register_setup() function in ov7670.c. Specifically, we want to:
+Complete the `camera_register_setup()` function in `ov7670.c`. Specifically, we want to:
 
 * Ensure the output image array is 640×480, which is the maximum size the camera supports.
 * Set the synchronization signal delay to 0.
@@ -64,7 +64,7 @@ Complete the camera_register_setup() function in ov7670.c. Specifically, we want
 
 If you have time and want the image to look better, I listed some registers that are worth trying to tune. It took me several nights to balance colors, but it was fun!
 
-Pass `2-camera-setup.c` before starting the next part. 
+Pass `2-camera-setup.c` before starting the next part. You should see the time spent in a frame.
 
 ----------------------------------------------------------------------
 ### Part 3: Caputure image and show on HDMI display
@@ -74,7 +74,7 @@ Note: If you don't have a display, comment out `camera_display()` function and u
 To understand how the camera transmits data, the datasheet has a good diagram showing how VGA works:
 
 <p align="center">
-<img src="images/vga.png" width="400" />
+<img src="images/vga.png" width="800" />
 </p>
 
 The diagram illustrates the timing for a single frame.
@@ -84,13 +84,13 @@ The diagram illustrates the timing for a single frame.
 * The active data period for one line is $640 \times t_{\text{P}}$.The total time for one line is $\mathbf{t_{\text{LINE}}} = 784 \times t_{\text{P}}$. 
 * The data pins, D[7:0], transmit valid pixel data only when HREF is high. The data is clocked out by PCLK (where $t_{\text{P}}$ is the PCLK period).
 
-The VGA synchronization is implemented in the function `camera_display()`. It's fun to look into this function to see if you can optimize it.
+The VGA synchronization logic is implemented in the function `camera_display()`. It's fun to look into this function to see if you can optimize it.
 
 RGB565 data are packed in 2 bytes. Refer to the datasheet below:
 <p align="center">
-<img src="images/rgb565.png" width="400" />
+<img src="images/rgb565.png" width="800" />
 </p>
 
-Complete `extract_rgb565()` function in `ov7670.c` The function wait for the edge of HREF, read two bytes, rearrange the bits, and output the RGB pixel. 
+Complete `extract_rgb565()` function in `ov7670.c` The function waits for the edge of HREF, reads two bytes, rearranges the bits, and outputs a RGB pixel. 
 
 If you connect your hdmi display and run `3-camera-display.c`, you should see the image (video) on the display. Make sure to set the enums in `mbox.h` based on your display!
