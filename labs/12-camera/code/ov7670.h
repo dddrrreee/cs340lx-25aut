@@ -19,7 +19,7 @@
 #define GP1_CLK_CTRL 0x20101078
 #define GP1_CLK_DIV 0x2010107c
 
-
+// Default image height/width
 #define IMAGE_HEIGHT 480
 #define IMAGE_WIDTH 640
 
@@ -107,11 +107,6 @@
 #define REG_HAECC6	0xa9	/* Hist AEC/AGC control 6 */
 #define REG_HAECC7	0xaa	/* Hist AEC/AGC control 7 */
 #define REG_BD60MAX	0xab	/* 60hz banding step limit */
-
-
-extern uint32_t img_raw_buffer_1[IMAGE_HEIGHT][IMAGE_WIDTH];
-extern uint32_t img_raw_buffer_2[IMAGE_HEIGHT][IMAGE_WIDTH];
-
 
 // RGB565 format:
 // Byte 1: D7-D3 = Red[4:0], D2-D0 = Green[5:3]

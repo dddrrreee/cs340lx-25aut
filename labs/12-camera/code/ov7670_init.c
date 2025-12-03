@@ -46,7 +46,7 @@ void camera_pins_setup(void) {
   // You can start from setting the integer part to 0x64
   todo("Setup Clock Divisor");
 
-  // 3. Set clock source
+  // 3. Set clock source (BCM2835 p.107)
   // First disable clock generator and wait until BUSY==0
   PUT32(GP1_CLK_CTRL, 0x5A000000);
   while(bit_is_on(GET32(GP1_CLK_CTRL), 7));

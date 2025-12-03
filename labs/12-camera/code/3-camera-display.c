@@ -16,5 +16,7 @@ void notmain(void) {
     uint8_t* fb;
     fb = device_initialize(PHY_WIDTH, PHY_HEIGHT, VIR_WIDTH, VIR_HEIGHT, DEPTH, BGR);
     camera_display(fb, &height_offset);
+
+    // If you don't have a display, directly print the pixel values.
     // print_camera_value();
 }

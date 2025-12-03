@@ -23,7 +23,6 @@ void camera_register_setup(void) {
 
   // Register reset
   imu_wr(SLAVE_ADDR, REG_COM7, COM7_RESET);
-
   // Set internal clock to input clock
   imu_wr(SLAVE_ADDR, REG_CLKRC, 0x00);
   // Scaling pclk enable, pclk very slow
@@ -123,8 +122,9 @@ void camera_display(uint8_t *fb, uint32_t *height_offset) {
   }
 }
 
-// Print pixels' red component. 
-// You can use the printed numbers to generate a .jpg image. 
+// Print pixels' red component.
+// If you have a camera, ignore this function.
+// You can use the printed numbers to generate a .jpg image.
 void print_camera_value() {
   uint8_t img_raw_buffer[(IMAGE_HEIGHT+1)/20 * (IMAGE_WIDTH+1)/20] = {0};
   wait_neg_edge(VS);
