@@ -3,7 +3,7 @@ PROGS := 1-pin-setup.c
 # PROGS := 3-camera-display.c
 
 # COMMON_SRC += ov7670_init.c
-# COMMON_SRC += ov7660.c
+# COMMON_SRC += ov7670.c
 PREBUILT_OBJS := ov7670_staff.o
 PREBUILT_OBJS += mbox_staff.o
 PREBUILT_OBJS += i2c_staff.o
