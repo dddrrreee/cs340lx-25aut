@@ -35,7 +35,7 @@ Complete the `camera_pins_setup()` function in `ov7670_init.c`. Specifically, yo
 
 BCM2835 datasheet p.102-108 is useful:
 <p align="center">
-<img src="images/gpio_clk1.png" width="400" />
+<img src="images/gpio_clk1.png" width="600" />
 </p>
 See p.107 for GPIO clock control, and p.108 for clock divisor. 
 
@@ -43,11 +43,10 @@ See p.107 for GPIO clock control, and p.108 for clock divisor.
 The `code` folder includes the staff's implementation `i2c.o` and `mbox.o`. To drop in your own I2C driver and mbox implementation, add it to `COMMON_SRC` and 
 remove `PREBUILT_OBJS` from the Makefile. 
 
-Pass `1-pin-setup.c` before starting the next part. 
+Pass `1-pin-setup.c` before starting the next part. \
+
 ----------------------------------------------------------------------
-
-
-Part 2: Control Register Setup
+### Part 2: Control Register Setup
 Before getting pixels from the camera, we need to set the camera's control registers so that it outputs with the desired frequency, format, and color.
 
 There are around 200 configurable control registers, listed in p.11-26 in the OV7670 datasheet. Most of them are related to color (including brightness, contrast, and various matrices). If we only care about the correct frequency, image size, and data format, only a few of them need to be configured.
@@ -56,11 +55,9 @@ To set these registers, we will use the imu_wr() function to transmit the regist
 
 Complete the camera_register_setup() function in ov7670.c. Specifically, we want to:
 
-Ensure the output image array is 640×480, which is the maximum size the camera supports.
-
-Set the synchronization signal delay to 0.
-
-Set the data format to RGB565 and the data range to 00-FF.
+* Ensure the output image array is 640×480, which is the maximum size the camera supports.
+* Set the synchronization signal delay to 0.
+* Set the data format to RGB565 and the data range to 00-FF.
 
 If you have time and want the image to look better, I listed some registers that are worth trying to tune. It took me several nights to balance colors, but it was fun!
 
