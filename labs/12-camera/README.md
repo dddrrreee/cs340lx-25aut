@@ -1,4 +1,4 @@
-### OV7670 Camera
+# OV7670 Camera
 
 **Lab by: [Chia-Hsiang Chang](mailto:hsiangc@stanford.edu)**
 
@@ -32,7 +32,8 @@ The wiring is done by the PCB. Use `ov7670_staff.o` to test if the PCB is workin
 * MCLK (Master Clock) is the master clock which drives the camera. **We're going to implement this pin**.
 
 Complete the `camera_pins_setup()` function in `ov7670_init.c`. Specifically, you will: 
-* Set up the master clock pin to General Purpose Clock 1 (GPCLK1).* Set up the clock divisor. Set the integer part to 0x64.
+* Set up the master clock pin to General Purpose Clock 1 (GPCLK1).
+* Set up the clock divisor. Set the integer part to 0x64.
 * Set up the clock source to PLLD. PLLD is a clock of 500MHz. So, if you set the divisor to 0x64 (which is 100 in decimal), the output clock frequency (the clock we output from MCLK to the camera) will be $500 \text{ MHz} / 100 = \mathbf{5 \text{ MHz}}$.
 
 BCM2835 datasheet p.102-108 is useful:
