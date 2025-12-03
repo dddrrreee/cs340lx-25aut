@@ -1,5 +1,7 @@
 ### OV7670 Camera
 
+**Lab by: [Chia-Hsiang Chang](mailto:hsiangc@stanford.edu)**
+
 <p align="center"><img src="images/ov7670.jpg" width="400" /></p>
 
 The OV7670 module is a camera module with a maximum array size of 640*480. It supports output formats such as RGB565, RGB555, RGB444, YUV, GRB, etc. Today, we're going to drive this camera and display the images on your HDMI display! You'll need the datasheet in the doc folder.
