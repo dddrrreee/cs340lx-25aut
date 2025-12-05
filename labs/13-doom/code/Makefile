@@ -21,6 +21,22 @@ RUN=1
 LIBS += $(LIBM)
 CFLAGS += $(LIBM_INC)
 
+# turn off errors
+CFLAGS += -Wno-unknown-pragmas 
+CFLSGS += -Wno-maybe-uninitialized
+CFLAGS += -Wno-pointer-to-int-cast
+CFLAGS += -Wno-unused-but-set-variable
+CFLAGS += -Wno-maybe-uninitialized
+CFLAGS += -Wno-int-to-pointer-cast
+CFLAGS += -Wno-overflow
+CFLAGS += -Wno-parentheses
+CFLAGS += -Wno-incompatible-pointer-types
+CFLAGS += -Wno-enum-compare
+
+
+
+
+
 # Software floating point
 # LIBS += $(CS340LX_2025_PATH)/lib/libgcc.a
 # LIB_POST += $(CS340LX_2025_PATH)/lib/libgcc.a
